@@ -70,7 +70,7 @@ export default function Onboarding({ onAction }) {
       <div className="grid items-stretch gap-5 lg:grid-cols-[330px_minmax(0,1fr)]">
         <aside className="rounded-[11px] border border-[#e0e6ee] bg-white px-3 py-3.5 lg:min-h-[628px]">
           <div className="flex items-start justify-between px-1.5">
-            <div><h2 className="text-[14px] font-bold text-[#11243f]">Active processes</h2><p className="mt-1 text-xs text-[#8a96a7]">2 processes in progress</p></div>
+            <div><h2 className="text-[14px] font-bold text-[#11243f]">Active processes</h2><p className="mt-1 text-xs text-[#8a96a7]">{employees.length} processes in progress</p></div>
             <Search size={17} className="mt-1 text-[#8998ad]" />
           </div>
           <div className="mt-6 space-y-1.5">
