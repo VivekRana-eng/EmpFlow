@@ -23,3 +23,40 @@ button { cursor: pointer; }
 .bg-indigo-100 { background-color: #dce9e0 !important; }
 .border-indigo-200 { border-color: #b9d0c1 !important; }
 .shadow-indigo-200 { --tw-shadow-color: rgb(66 103 89 / 0.2) !important; }
+
+.onboarding-page select {
+  accent-color: #426759;
+}
+
+.onboarding-page select option:checked {
+  background: #426759;
+  color: #fff;
+}
+
+.onboarding-page select option:hover,
+.onboarding-page select option:focus {
+  background: #dce9e0;
+  color: #315447;
+}
+
+.employee-profile-card > div:nth-child(2) > div:last-child > button:last-of-type {
+  display: inline-flex;
+  height: 2rem;
+  width: 2rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.5rem;
+  background: rgb(255 255 255 / 0.1);
+  box-shadow: 0 0 0 1px rgb(255 255 255 / 0.1);
+}
+
+/* Edit fields stay in their original detail rows. */
+.employee-profile-card > div[class*="top-[101px]"] {
+  display: none;
+}
+
+.employee-directory > div:first-child > button,
+.employee-directory th:last-child,
+.employee-directory td:last-child {
+  display: none;
+}
