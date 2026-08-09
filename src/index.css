@@ -17,6 +17,15 @@ button { cursor: pointer; }
 body { overflow-x: hidden; }
 .mobile-menu-trigger { position: relative; z-index: 60; touch-action: manipulation; }
 .mobile-menu-overlay { touch-action: auto; }
+.sidebar-scroll {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.sidebar-scroll::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
+}
 
 /* The product palette uses a calm sage accent against the warm workspace. */
 .bg-indigo-600 { background-color: #426759 !important; }

@@ -4,6 +4,9 @@ import { Check, Plus, Search, ShieldCheck } from 'lucide-react'
 const initialEmployees = [
   { name: 'Nisha Verma', initials: 'NV', date: '2026-07-15', status: 'In Progress', employeeId: 'EMP-4821' },
   { name: 'Sara Khan', initials: 'SK', date: '2026-07-21', status: 'Pending Approval', employeeId: 'EMP-7364' },
+  { name: 'Vivek Rana', initials: 'VR', date: '2026-07-24', status: 'In Progress', employeeId: 'EMP-1947' },
+  { name: 'Aditi Deshmukh', initials: 'AD', date: '2026-07-28', status: 'Draft', employeeId: 'EMP-6083' },
+  { name: 'Rahul Sharma', initials: 'RS', date: '2026-08-01', status: 'In Progress', employeeId: 'EMP-2759' },
 ]
 
 const documents = [
@@ -32,7 +35,15 @@ function Step({ number, label, active, done }) {
 
 export default function Onboarding({ onAction }) {
   const [employees, setEmployees] = useState(() => {
-    try { return normalizeEmployees(JSON.parse(localStorage.getItem('empflow-employees')) || initialEmployees) } catch { return initialEmployees }
+    try {
+      const savedEmployees = JSON.parse(localStorage.getItem('empflow-employees'))
+      if (Array.isArray(savedEmployees) && savedEmployees.length) {
+        const savedNames = new Set(savedEmployees.map((employee) => employee.name))
+        const missingMockEmployees = initialEmployees.filter((employee) => !savedNames.has(employee.name))
+        return normalizeEmployees([...savedEmployees, ...missingMockEmployees].slice(0, initialEmployees.length))
+      }
+      return normalizeEmployees(initialEmployees)
+    } catch { return initialEmployees }
   })
   const [selected, setSelected] = useState('Sara Khan')
   const [checked, setChecked] = useState(() => {
@@ -42,7 +53,7 @@ export default function Onboarding({ onAction }) {
   const [approvalRequested, setApprovalRequested] = useState(() => {
     try { return JSON.parse(localStorage.getItem('empflow-approval-requested')) || false } catch { return false }
   })
-  const current = employees.find((employee) => employee.name === selected)
+  const current = employees.find((employee) => employee.name === selected) || employees[0] || initialEmployees[1]
   const currentDetails = current?.draft || {}
   const completedDocuments = checked.filter(Boolean).length
   const progress = Math.round((completedDocuments / documents.length) * 100)
