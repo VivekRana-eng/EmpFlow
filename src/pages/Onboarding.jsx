@@ -36,7 +36,7 @@ function Step({ number, label, active, done }) {
 export default function Onboarding({ onAction }) {
   const [employees, setEmployees] = useState(() => {
     try {
-      const savedEmployees = JSON.parse(localStorage.getItem('empflow-employees'))
+      const savedEmployees = JSON.parse(localStorage.getItem('empflow-onboarding-employees'))
       if (Array.isArray(savedEmployees) && savedEmployees.length) {
         const savedNames = new Set(savedEmployees.map((employee) => employee.name))
         const missingMockEmployees = initialEmployees.filter((employee) => !savedNames.has(employee.name))
@@ -58,7 +58,7 @@ export default function Onboarding({ onAction }) {
   const completedDocuments = checked.filter(Boolean).length
   const progress = Math.round((completedDocuments / documents.length) * 100)
 
-  useEffect(() => localStorage.setItem('empflow-employees', JSON.stringify(employees)), [employees])
+  useEffect(() => localStorage.setItem('empflow-onboarding-employees', JSON.stringify(employees)), [employees])
   useEffect(() => localStorage.setItem('empflow-document-checks', JSON.stringify(checked)), [checked])
   useEffect(() => localStorage.setItem('empflow-approval-requested', JSON.stringify(approvalRequested)), [approvalRequested])
 

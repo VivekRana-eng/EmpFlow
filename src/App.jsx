@@ -130,9 +130,10 @@ function App() {
       const saved = localStorage.getItem('empflow-employees')
       if (saved) {
         const parsed = JSON.parse(saved)
-        if (Array.isArray(parsed) && parsed.length) {
-          const savedIds = new Set(parsed.map((employee) => employee.id))
-          return [...parsed, ...employeeRecords.filter((employee) => !savedIds.has(employee.id))].slice(0, employeeRecords.length)
+        const validEmployeeRecords = Array.isArray(parsed) ? parsed.filter((employee) => employee?.id && employee?.department_id) : []
+        if (validEmployeeRecords.length) {
+          const savedIds = new Set(validEmployeeRecords.map((employee) => employee.id))
+          return [...validEmployeeRecords, ...employeeRecords.filter((employee) => !savedIds.has(employee.id))].slice(0, employeeRecords.length)
         }
       }
     } catch {}
@@ -198,8 +199,11 @@ function App() {
         const savedEmps = localStorage.getItem('empflow-employees')
         if (savedEmps) {
           const parsed = JSON.parse(savedEmps)
-          if (JSON.stringify(parsed) !== JSON.stringify(employeeRecordsState)) {
-            setEmployeeRecordsState(parsed)
+          const validEmployeeRecords = Array.isArray(parsed) ? parsed.filter((employee) => employee?.id && employee?.department_id) : []
+          const savedIds = new Set(validEmployeeRecords.map((employee) => employee.id))
+          const normalizedEmployees = [...validEmployeeRecords, ...employeeRecords.filter((employee) => !savedIds.has(employee.id))].slice(0, employeeRecords.length)
+          if (JSON.stringify(normalizedEmployees) !== JSON.stringify(employeeRecordsState)) {
+            setEmployeeRecordsState(normalizedEmployees)
           }
         }
       } catch (e) {
