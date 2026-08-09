@@ -128,7 +128,13 @@ function App() {
   const [employeeRecordsState, setEmployeeRecordsState] = useState(() => {
     try {
       const saved = localStorage.getItem('empflow-employees')
-      if (saved) return JSON.parse(saved)
+      if (saved) {
+        const parsed = JSON.parse(saved)
+        if (Array.isArray(parsed) && parsed.length) {
+          const savedIds = new Set(parsed.map((employee) => employee.id))
+          return [...parsed, ...employeeRecords.filter((employee) => !savedIds.has(employee.id))].slice(0, employeeRecords.length)
+        }
+      }
     } catch {}
     return employeeRecords
   })
