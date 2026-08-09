@@ -85,6 +85,7 @@ function StatusBadge({ status }) {
 function App() {
   const [activePage, setActivePage] = useState('Dashboard')
   const [collapsed, setCollapsed] = useState(true)
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [search, setSearch] = useState('')
   const [toast, setToast] = useState('')
   const [isScrolled, setIsScrolled] = useState(false)
@@ -142,11 +143,12 @@ function App() {
           <button title={collapsed ? 'Collapse sidebar' : undefined} onClick={() => setCollapsed(!collapsed)} className="flex w-full items-center justify-center rounded-lg p-2 text-slate-400 hover:bg-slate-50 hover:text-slate-700">{collapsed ? <Menu size={18} /> : <><ChevronRight size={16} className="rotate-180" /><span className="ml-2 text-xs">Collapse sidebar</span></>}</button>
         </div>
       </aside>
+      {mobileMenuOpen && <div className="mobile-menu-overlay fixed inset-0 z-[100] bg-slate-900/30" onClick={() => setMobileMenuOpen(false)}><aside className="h-full w-[260px] bg-white p-4 shadow-2xl" onClick={(event) => event.stopPropagation()}><div className="mb-6 flex items-center justify-between"><div className="flex items-center gap-3"><div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#426759] text-white"><Sparkles size={18} /></div><span className="font-bold text-slate-900">Emp<span className="text-indigo-600">Flow</span></span></div><button onClick={() => setMobileMenuOpen(false)} className="rounded-lg p-2 text-slate-400"><X size={18} /></button></div><nav className="space-y-1">{navItems.map(({ label, icon: Icon, count }) => <button key={label} onClick={() => { setActivePage(label); setMobileMenuOpen(false) }} className={`flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left text-sm font-medium ${activePage === label ? 'bg-indigo-50 text-indigo-700' : 'text-slate-500 hover:bg-slate-50'}`}><Icon size={18} /><span className="flex-1">{label}</span>{count && <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] text-indigo-700">{count}</span>}</button>)}</nav></aside></div>}
 
       <main className={`w-full transition-all duration-200 ${collapsed ? 'lg:pl-[84px]' : 'lg:pl-[248px]'}`}>
         <header className={`sticky top-0 z-40 flex h-[76px] items-center justify-between border-0 bg-transparent px-4 transition-all duration-200 sm:px-7 ${isScrolled ? 'backdrop-blur-[2px] backdrop-saturate-100' : ''}`}>
           <div className="flex items-center gap-3">
-            <button className="rounded-lg p-2 text-slate-500 hover:bg-slate-50 lg:hidden"><Menu size={20} /></button>
+            <button onPointerDown={() => setMobileMenuOpen(true)} onClick={() => setMobileMenuOpen(true)} aria-label="Open navigation" className="mobile-menu-trigger rounded-lg p-2 text-slate-500 hover:bg-slate-50 lg:hidden"><Menu size={20} /></button>
             <div>
               <div className="flex items-center gap-2 text-xs text-slate-400"><span>Workspace</span><ChevronRight size={13} /><span className="font-medium text-slate-600">{activePage}</span></div><h1 className="mt-0.5 text-[17px] font-bold tracking-tight text-slate-900">{activePage}</h1></div></div>
           <div className="flex items-center gap-2 sm:gap-5"><div className="relative hidden md:block"><Search size={16} className="absolute left-3 top-2.5 text-slate-400" /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search anything..." className="h-9 w-56 rounded-lg border border-slate-200 bg-slate-50 pl-9 pr-3 text-xs outline-none transition placeholder:text-slate-400 focus:border-indigo-300 focus:bg-white focus:ring-2 focus:ring-indigo-100" /></div><button className="relative rounded-lg p-2 text-slate-500 hover:bg-slate-50"><Bell size={18} /><span className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-rose-500 ring-2 ring-white" /></button><button className="hidden rounded-lg p-2 text-slate-500 hover:bg-slate-50 sm:block"><CircleHelp size={18} /></button><div className="hidden h-6 w-px bg-slate-200 sm:block" /><button className="flex items-center gap-2"><div className="flex h-8 w-8 items-center justify-center rounded-full bg-indigo-600 text-[11px] font-semibold text-white">AD</div><ChevronDown size={14} className="text-slate-400" /></button></div>

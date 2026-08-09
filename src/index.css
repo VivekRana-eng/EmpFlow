@@ -14,6 +14,9 @@
 body { margin: 0; min-width: 320px; }
 button, input { font: inherit; }
 button { cursor: pointer; }
+body { overflow-x: hidden; }
+.mobile-menu-trigger { position: relative; z-index: 60; touch-action: manipulation; }
+.mobile-menu-overlay { touch-action: auto; }
 
 /* The product palette uses a calm sage accent against the warm workspace. */
 .bg-indigo-600 { background-color: #426759 !important; }
@@ -59,4 +62,88 @@ button { cursor: pointer; }
 .employee-directory th:last-child,
 .employee-directory td:last-child {
   display: none;
+}
+
+@media (max-width: 1023px) {
+  main { min-width: 0; }
+  .employee-directory,
+  .onboarding-page { width: 100%; min-width: 0; }
+}
+
+@media (max-width: 640px) {
+  .onboarding-page {
+    padding: 14px 10px !important;
+  }
+
+  .onboarding-page > div > div:first-child {
+    align-items: flex-start;
+    flex-direction: column;
+    margin-bottom: 18px;
+  }
+
+  .onboarding-page > div > div:first-child > button {
+    width: 100%;
+  }
+
+  .onboarding-page section,
+  .onboarding-page aside {
+    min-height: auto !important;
+    padding: 14px !important;
+  }
+
+  .onboarding-page section .flex.items-center.justify-between {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .onboarding-page section .flex.items-center.justify-between > button {
+    width: 100%;
+  }
+
+  .onboarding-page form .grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .onboarding-page form .flex.flex-wrap.items-center.justify-between {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .onboarding-page form .flex.flex-wrap.items-center.justify-between > div {
+    justify-content: stretch;
+  }
+
+  .onboarding-page form .flex.flex-wrap.items-center.justify-between button {
+    flex: 1;
+  }
+
+  .employee-profile-card {
+    max-height: calc(100vh - 24px);
+    overflow-y: auto;
+  }
+
+  .employee-profile-card > div:nth-child(2) {
+    padding: 18px !important;
+  }
+
+  .employee-profile-card > div:nth-child(3),
+  .employee-profile-card > div:nth-child(4) {
+    grid-template-columns: minmax(0, 1fr);
+    padding-left: 18px;
+    padding-right: 18px;
+  }
+
+  .employee-profile-card .absolute.right-16 {
+    right: 54px;
+  }
+
+  .employee-directory .overflow-x-auto {
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .employee-directory .mt-4.flex.items-center.justify-between {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 10px;
+  }
 }
