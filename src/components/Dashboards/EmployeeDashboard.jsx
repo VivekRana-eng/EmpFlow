@@ -535,7 +535,11 @@ This document serves as an official company record of employment history and cre
                 <p><b>Document Status:</b> {viewerDoc.status}</p>
               </div>
               <div className="border-t border-slate-200 pt-3 text-[10px]">
-                {viewerDoc.dataUrl && viewerDoc.dataUrl.startsWith('data:image/') ? (
+                {viewerDoc.resolvedContent ? (
+                  <div className="whitespace-pre-wrap font-sans text-xs text-slate-600 leading-relaxed text-left bg-slate-50 p-3.5 rounded-lg border border-slate-100 mb-2">
+                    {viewerDoc.resolvedContent}
+                  </div>
+                ) : viewerDoc.dataUrl && viewerDoc.dataUrl.startsWith('data:image/') ? (
                   <div className="text-center space-y-2">
                     <p className="font-bold text-[9px] uppercase tracking-wider text-slate-400">Uploaded Image Preview</p>
                     <img src={viewerDoc.dataUrl} className="mx-auto max-h-[180px] rounded-lg border border-slate-200 shadow-sm" alt={viewerDoc.name} />

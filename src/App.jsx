@@ -29,6 +29,7 @@ import {
   UserPlus,
   Users,
   X,
+  Trash2,
 } from 'lucide-react'
 import { initialEmployees as employeeRecords, initialDepartments, initialDesignations } from './models/employeeModel'
 import { initialOnboardingProcesses } from './models/onboardingModel'
@@ -43,6 +44,8 @@ import LoginPage from './components/Login/LoginPage'
 import EmployeeDashboard from './components/Dashboards/EmployeeDashboard'
 import ManagerDashboard from './components/Dashboards/ManagerDashboard'
 import AdminSettings from './components/Dashboards/AdminSettings'
+import TemplateManagement from './components/Dashboards/TemplateManagement'
+import ReportsWorkspace from './components/Dashboards/ReportsWorkspace'
 
 const navItems = [
   { label: 'Dashboard', icon: LayoutDashboard },
@@ -166,13 +169,55 @@ function App() {
       const saved = localStorage.getItem('empflow-offboardings')
       if (saved) {
         const parsed = JSON.parse(saved)
-        if (Array.isArray(parsed) && parsed.length) return parsed.slice(0, 3)
+        if (Array.isArray(parsed) && parsed.length && parsed[0].tasks) return parsed.slice(0, 3)
       }
     } catch {}
     return [
-      { id: 'fp1', employee_id: 'e3', employee_name: 'Manoj Kumar', department: 'Finance & Treasury', last_working_date: '2026-08-29', status: 'In Progress' },
-      { id: 'fp2', employee_id: 'e9', employee_name: 'Sneha Iyer', department: 'Human Resources', last_working_date: '2026-08-28', status: 'In Progress' },
-      { id: 'fp3', employee_id: 'e15', employee_name: 'Ankit Gupta', department: 'Information Technology', last_working_date: '2026-09-15', status: 'Pending' }
+      { 
+        id: 'fp1', 
+        employee_id: 'e3', 
+        employee_name: 'Manoj Kumar', 
+        department: 'Finance & Treasury', 
+        last_working_date: '2026-08-29', 
+        status: 'In Progress',
+        tasks: [
+          { name: 'Asset Return', status: 'Completed' },
+          { name: 'Knowledge Transfer', status: 'Completed' },
+          { name: 'Access Revocation', status: 'Completed' },
+          { name: 'Exit Interview', status: 'Pending' },
+          { name: 'Final Settlement', status: 'Pending' }
+        ]
+      },
+      { 
+        id: 'fp2', 
+        employee_id: 'e9', 
+        employee_name: 'Sneha Iyer', 
+        department: 'Human Resources', 
+        last_working_date: '2026-08-28', 
+        status: 'In Progress',
+        tasks: [
+          { name: 'Asset Return', status: 'Completed' },
+          { name: 'Knowledge Transfer', status: 'Completed' },
+          { name: 'Access Revocation', status: 'Completed' },
+          { name: 'Exit Interview', status: 'Completed' },
+          { name: 'Final Settlement', status: 'Pending' }
+        ]
+      },
+      { 
+        id: 'fp3', 
+        employee_id: 'e15', 
+        employee_name: 'Ankit Gupta', 
+        department: 'Information Technology', 
+        last_working_date: '2026-09-15', 
+        status: 'Pending',
+        tasks: [
+          { name: 'Asset Return', status: 'Pending' },
+          { name: 'Knowledge Transfer', status: 'Pending' },
+          { name: 'Access Revocation', status: 'Pending' },
+          { name: 'Exit Interview', status: 'Pending' },
+          { name: 'Final Settlement', status: 'Pending' }
+        ]
+      }
     ]
   })
 
@@ -382,6 +427,48 @@ function App() {
     setSelectedEmployee(null)
     setAutoOpenDocName(null)
     setShowProfileMenu(false)
+  }
+
+  const handleToggleOffboardingTask = (processId, taskName) => {
+    const updated = offboardings.map(process => {
+      if (process.id === processId) {
+        const tasksList = process.tasks || []
+        const updatedTasks = tasksList.map(task => {
+          if (task.name === taskName) {
+            return { ...task, status: task.status === 'Completed' ? 'Pending' : 'Completed' }
+          }
+          return task
+        })
+        
+        const completedCount = updatedTasks.filter(t => t.status === 'Completed').length
+        const totalTasks = updatedTasks.length
+        let newStatus = process.status
+        if (completedCount === totalTasks) {
+          newStatus = 'Completed'
+        } else if (completedCount > 0) {
+          newStatus = 'In Progress'
+        } else {
+          newStatus = 'Pending'
+        }
+
+        return { ...process, tasks: updatedTasks, status: newStatus }
+      }
+      return process
+    })
+    setOffboardings(updated)
+    localStorage.setItem('empflow-offboardings', JSON.stringify(updated))
+    showToast('Offboarding task progress updated')
+    window.dispatchEvent(new Event('storage'))
+  }
+
+  const handleRemoveOffboarding = (processId, name) => {
+    if (window.confirm(`Are you sure you want to remove the offboarding process for ${name}?`)) {
+      const updated = offboardings.filter(p => p.id !== processId)
+      setOffboardings(updated)
+      localStorage.setItem('empflow-offboardings', JSON.stringify(updated))
+      showToast(`Offboarding process for ${name} removed`)
+      window.dispatchEvent(new Event('storage'))
+    }
   }
 
   const currentTime = new Date()
@@ -725,7 +812,7 @@ function App() {
             ) : activePage === 'Reports' ? (
               <ModulePlaceholder page={activePage} onAction={showToast} />
             ) : activePage === 'Offboarding' ? (
-              <OffboardingBoard offboardings={offboardings} />
+              <OffboardingBoard offboardings={offboardings} onToggleTask={handleToggleOffboardingTask} onRemove={handleRemoveOffboarding} />
             ) : (
               <ManagerDashboard onAction={showToast} />
             )
@@ -734,9 +821,13 @@ function App() {
           ) : activePage === 'Onboarding' ? (
             <Onboarding onAction={showToast} />
           ) : activePage === 'Offboarding' ? (
-            <OffboardingBoard offboardings={offboardings} />
+            <OffboardingBoard offboardings={offboardings} onToggleTask={handleToggleOffboardingTask} onRemove={handleRemoveOffboarding} />
           ) : activePage === 'Settings' ? (
             <AdminSettings onAction={showToast} departments={departments} setDepartments={setDepartments} designations={designations} setDesignations={setDesignations} employeeRecordsState={employeeRecordsState} onUpdateEmployeeRole={handleUpdateEmployeeRole} />
+          ) : activePage === 'Template Management' ? (
+            <TemplateManagement currentUser={currentUser} employeeRecordsState={employeeRecordsState} departments={departments} designations={designations} showToast={showToast} />
+          ) : activePage === 'Reports' ? (
+            <ReportsWorkspace currentUser={currentUser} employeeRecordsState={employeeRecordsState} departments={departments} designations={designations} offboardings={offboardings} showToast={showToast} />
           ) : activePage !== 'Dashboard' ? (
             <ModulePlaceholder page={activePage} onAction={showToast} />
           ) : (
@@ -797,18 +888,58 @@ function App() {
   )
 }
 
-function OffboardingBoard({ offboardings }) {
+function OffboardingBoard({ offboardings, onToggleTask, onRemove }) {
   return <div className="mx-auto max-w-[1440px]">
     <div className="mb-6 flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
-      <div><p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.15em] text-[#8794a8]">Employee lifecycle</p><h2 className="text-2xl font-bold tracking-tight text-slate-900">Offboarding</h2><p className="mt-1 text-sm text-slate-500">Manage employees leaving the organization.</p></div>
+      <div>
+        <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.15em] text-[#8794a8] text-left">Employee lifecycle</p>
+        <h2 className="text-2xl font-bold tracking-tight text-slate-900 text-left">Offboarding</h2>
+        <p className="mt-1 text-sm text-slate-500 text-left">Manage employees leaving the organization and track exit requirements.</p>
+      </div>
       <span className="w-fit rounded-full bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-700">{offboardings.length} active processes</span>
     </div>
     <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-      {offboardings.map((process) => <article key={process.id} className="rounded-xl border border-slate-200 bg-white p-5 shadow-[0_2px_8px_rgba(15,23,42,0.025)]">
-        <div className="flex items-start justify-between gap-3"><div className="flex items-center gap-3"><div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#edf3ef] text-xs font-bold text-[#426759]">{(process.employee_name || 'Employee').split(' ').map((part) => part[0]).join('').slice(0, 2)}</div><div><h3 className="text-sm font-bold text-slate-800">{process.employee_name || 'Employee'}</h3><p className="mt-1 text-xs text-slate-500">{process.department || 'Department'}</p></div></div><StatusBadge status={process.status} /></div>
-        <div className="mt-5 grid grid-cols-2 gap-3 border-t border-slate-100 pt-4"><div><p className="text-[10px] uppercase tracking-wide text-slate-400">Last working date</p><p className="mt-1 text-xs font-semibold text-slate-700">{process.last_working_date || 'Not set'}</p></div><div><p className="text-[10px] uppercase tracking-wide text-slate-400">Employee ID</p><p className="mt-1 text-xs font-semibold text-slate-700">{process.employee_id || '—'}</p></div></div>
-        <div className="mt-4 flex items-center gap-2 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-500"><Check size={14} className="text-[#426759]" />Exit process is being tracked</div>
-      </article>)}
+      {offboardings.map((process) => (
+        <article key={process.id} className="rounded-xl border border-slate-200 bg-white p-5 shadow-[0_2px_8px_rgba(15,23,42,0.025)] flex flex-col justify-between">
+          <div>
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#edf3ef] text-xs font-bold text-[#426759]">
+                  {(process.employee_name || 'Employee').split(' ').map((part) => part[0]).join('').slice(0, 2)}
+                </div>
+                <div className="text-left">
+                  <h3 className="text-sm font-bold text-slate-800">{process.employee_name || 'Employee'}</h3>
+                  <p className="mt-1 text-xs text-slate-500">{process.department || 'Department'}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <StatusBadge status={process.status} />
+                <button 
+                  onClick={() => onRemove(process.id, process.employee_name)}
+                  className="p-1 rounded-lg text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition cursor-pointer"
+                  title="Remove Exit Process"
+                >
+                  <Trash2 size={13} />
+                </button>
+              </div>
+            </div>
+            <div className="mt-5 grid grid-cols-2 gap-3 border-t border-slate-100 pt-4 text-left">
+              <div>
+                <p className="text-[10px] uppercase tracking-wide text-slate-400">Last working date</p>
+                <p className="mt-1 text-xs font-semibold text-slate-700">{process.last_working_date || 'Not set'}</p>
+              </div>
+              <div>
+                <p className="text-[10px] uppercase tracking-wide text-slate-400">Employee ID</p>
+                <p className="mt-1 text-xs font-semibold text-slate-700">{process.employee_id || '—'}</p>
+              </div>
+            </div>
+          </div>
+          <div className="mt-4 flex items-center gap-2 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-500 text-left">
+            <Check size={14} className="text-[#426759]" />
+            <span>Exit process is being tracked</span>
+          </div>
+        </article>
+      ))}
     </div>
   </div>
 }
@@ -1187,7 +1318,11 @@ function EmployeeProfileCard({ employee, onClose, onAction, currentUser, onUpdat
                 {profileViewerDoc.rejectionReason && <p className="text-rose-600"><b>Rejection Reason:</b> {profileViewerDoc.rejectionReason}</p>}
               </div>
               <div className="border-t border-slate-200 pt-3 text-[10px]">
-                {profileViewerDoc.dataUrl && profileViewerDoc.dataUrl.startsWith('data:image/') ? (
+                {profileViewerDoc.resolvedContent ? (
+                  <div className="whitespace-pre-wrap font-sans text-xs text-slate-600 leading-relaxed text-left bg-slate-50 p-3.5 rounded-lg border border-slate-100 mb-2">
+                    {profileViewerDoc.resolvedContent}
+                  </div>
+                ) : profileViewerDoc.dataUrl && profileViewerDoc.dataUrl.startsWith('data:image/') ? (
                   <div className="text-center space-y-2">
                     <p className="font-bold text-[9px] uppercase tracking-wider text-slate-400">Uploaded Image Preview</p>
                     <img src={profileViewerDoc.dataUrl} className="mx-auto max-h-[180px] rounded-lg border border-slate-200 shadow-sm" alt={profileViewerDoc.name} />
