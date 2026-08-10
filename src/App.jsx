@@ -8,6 +8,7 @@ import {
   CalendarDays,
   Check,
   ChevronDown,
+  ChevronLeft,
   ChevronRight,
   CircleHelp,
   ClipboardCheck,
@@ -129,6 +130,17 @@ function App() {
   const [showHelp, setShowHelp] = useState(false)
   const [hasUnread, setHasUnread] = useState(true)
   
+  const [showAddEmployeeModal, setShowAddEmployeeModal] = useState(false)
+  const [showInitiateOffboardingModal, setShowInitiateOffboardingModal] = useState(false)
+  const [showCalendarModal, setShowCalendarModal] = useState(false)
+  const [showQuickActionsMenu, setShowQuickActionsMenu] = useState(false)
+  const [selectedOnboardingName, setSelectedOnboardingName] = useState(null)
+  const [onboardingFilter, setOnboardingFilter] = useState('All')
+  const [activeOnboardingRowMenu, setActiveOnboardingRowMenu] = useState(null)
+  const [growthTimeframe, setGrowthTimeframe] = useState('Last 6 months')
+  const [showGrowthTimeframeMenu, setShowGrowthTimeframeMenu] = useState(false)
+  const [showOnboardingStatusMenu, setShowOnboardingStatusMenu] = useState(false)
+
   const [selectedEmployee, setSelectedEmployee] = useState(null)
   const [autoOpenDocName, setAutoOpenDocName] = useState(null)
 
@@ -471,6 +483,26 @@ function App() {
     }
   }
 
+  const handleQuickAction = (title) => {
+    if (title === 'Add employee') {
+      setActivePage('Employees')
+      setShowAddEmployeeModal(true)
+    } else if (title === 'Start onboarding') {
+      setActivePage('Onboarding')
+      localStorage.setItem('empflow-auto-initiate-onboarding', 'true')
+    } else if (title === 'Initiate relieving') {
+      setActivePage('Offboarding')
+      setShowInitiateOffboardingModal(true)
+    } else if (title === 'Upload template') {
+      setActivePage('Template Management')
+      localStorage.setItem('empflow-auto-create-template', 'true')
+    } else if (title === 'Generate report') {
+      setActivePage('Reports')
+    } else if (title === 'View calendar') {
+      setShowCalendarModal(true)
+    }
+  }
+
   const currentTime = new Date()
   const currentHour = currentTime.getHours()
   const greeting = currentHour < 12 ? 'Good morning' : currentHour < 17 ? 'Good afternoon' : currentHour < 21 ? 'Good evening' : 'Good night'
@@ -518,7 +550,57 @@ function App() {
     return () => document.removeEventListener('click', handleDashboardActions)
   }, [])
 
-  const filteredEmployees = useMemo(() => employees.filter((employee) => employee.name.toLowerCase().includes(search.toLowerCase())), [search])
+  const filteredEmployees = useMemo(() => {
+    return employees.filter((employee) => {
+      const matchesSearch = employee.name.toLowerCase().includes(search.toLowerCase())
+      const matchesFilter = onboardingFilter === 'All' || employee.status === onboardingFilter
+      return matchesSearch && matchesFilter
+    })
+  }, [search, onboardingFilter])
+
+  const growthConfig = useMemo(() => {
+    switch (growthTimeframe) {
+      case 'Last 3 months':
+        return {
+          months: ['Jun', 'Jul', 'Aug'],
+          data: [230, 245, 248]
+        }
+      case 'Last 12 months':
+        return {
+          months: ['Sep', 'Oct', 'Nov', 'Dec', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug'],
+          data: [200, 202, 205, 208, 210, 212, 215, 218, 225, 230, 245, 248]
+        }
+      case 'Last 6 months':
+      default:
+        return {
+          months: ['Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug'],
+          data: [208, 218, 225, 230, 245, 248]
+        }
+    }
+  }, [growthTimeframe])
+
+  const growthPaths = useMemo(() => {
+    const data = growthConfig.data
+    if (data.length === 0) return { curvePath: '', areaPath: '' }
+    const points = data.map((v, i) => {
+      const x = (i / (data.length - 1)) * 500
+      const y = 100 - ((v - 200) / 60) * 85
+      return { x, y }
+    })
+    
+    let cPath = `M ${points[0].x} ${points[0].y}`
+    for (let i = 0; i < points.length - 1; i++) {
+      const p0 = points[i]
+      const p1 = points[i+1]
+      const cp1x = p0.x + (p1.x - p0.x) / 3
+      const cp1y = p0.y
+      const cp2x = p1.x - (p1.x - p0.x) / 3
+      const cp2y = p1.y
+      cPath += ` C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${p1.x} ${p1.y}`
+    }
+    const aPath = `${cPath} L 500 120 L 0 120 Z`
+    return { curvePath: cPath, areaPath: aPath }
+  }, [growthConfig])
 
   const showToast = (message) => {
     setToast(message)
@@ -819,7 +901,7 @@ function App() {
           ) : activePage === 'Employees' ? (
             <EmployeeDirectory search={search} onAction={showToast} currentUser={currentUser} employeeRecordsState={employeeRecordsState} departments={departments} designations={designations} onUpdateEmployee={handleUpdateEmployee} selectedEmployee={selectedEmployee} setSelectedEmployee={setSelectedEmployee} autoOpenDocName={autoOpenDocName} setAutoOpenDocName={setAutoOpenDocName} />
           ) : activePage === 'Onboarding' ? (
-            <Onboarding onAction={showToast} />
+            <Onboarding onAction={showToast} defaultSelected={selectedOnboardingName} setDefaultSelected={setSelectedOnboardingName} />
           ) : activePage === 'Offboarding' ? (
             <OffboardingBoard offboardings={offboardings} onToggleTask={handleToggleOffboardingTask} onRemove={handleRemoveOffboarding} />
           ) : activePage === 'Settings' ? (
@@ -841,28 +923,188 @@ function App() {
                   <p className="mt-1 text-sm text-slate-500">Here's what's happening across your employee lifecycle today.</p>
                 </div>
                 <div className="flex gap-2">
-                  <button onClick={() => showToast('Onboarding flow started')} className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3.5 py-2.5 text-xs font-semibold text-slate-700 shadow-sm transition hover:border-[#b9d0c1] hover:text-indigo-700"><UserPlus size={16} />Start onboarding</button>
-                  <button onClick={() => showToast('Add employee form opened')} className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#426759] px-3.5 py-2.5 text-xs font-semibold text-white shadow-sm shadow-[#426759]/20 transition hover:bg-[#315447]"><Plus size={16} />Add employee</button>
+                  <button onClick={() => handleQuickAction('Start onboarding')} className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3.5 py-2.5 text-xs font-semibold text-slate-700 shadow-sm transition hover:border-[#b9d0c1] hover:text-indigo-700"><UserPlus size={16} />Start onboarding</button>
+                  <button onClick={() => handleQuickAction('Add employee')} className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#426759] px-3.5 py-2.5 text-xs font-semibold text-white shadow-sm shadow-[#426759]/20 transition hover:bg-[#315447]"><Plus size={16} />Add employee</button>
                 </div>
               </section>
 
-              <section className="mb-7 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">{dynamicKpis.map(({ label, value, note, icon: Icon, trend, iconClass }) => <div key={label} className="rounded-xl border border-slate-200 bg-white p-4 shadow-[0_2px_8px_rgba(15,23,42,0.025)]"><div className="mb-4 flex items-start justify-between"><div className={`flex h-9 w-9 items-center justify-center rounded-lg ${iconClass}`}><Icon size={18} /></div>{trend === 'up' ? <ArrowUpRight size={16} className="text-emerald-500" /> : trend === 'down' ? <ArrowDownRight size={16} className="text-rose-400" /> : <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />}</div><p className="text-[12px] font-medium text-slate-500">{label}</p><div className="mt-1 flex items-end justify-between"><span className="text-2xl font-bold tracking-tight text-slate-900">{value}</span><span className={`text-[10px] font-medium ${trend === 'up' ? 'text-emerald-600' : trend === 'down' ? 'text-rose-500' : 'text-slate-400'}`}>{note}</span></div></div>)}</section>
+              <section className="mb-7 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
+                {dynamicKpis.map(({ label, value, note, icon: Icon, trend, iconClass }) => (
+                  <div 
+                    key={label} 
+                    onClick={() => {
+                      if (label === 'Total Employees') {
+                        setActivePage('Employees');
+                      } else if (label === 'New Joiners' || label === 'Active Onboarding' || label === 'Pending Approvals') {
+                        setActivePage('Onboarding');
+                      } else if (label === 'Employees Leaving') {
+                        setActivePage('Offboarding');
+                      } else if (label === 'Pending Documents') {
+                        setActivePage('Template Management');
+                      }
+                      showToast(`Showing details for ${label}`);
+                    }}
+                    className="rounded-xl border border-slate-200 bg-white p-4 shadow-[0_2px_8px_rgba(15,23,42,0.025)] transition hover:border-[#b9d0c1] hover:shadow-md cursor-pointer text-left group"
+                  >
+                    <div className="mb-4 flex items-start justify-between">
+                      <div className={`flex h-9 w-9 items-center justify-center rounded-lg transition-transform group-hover:scale-105 ${iconClass}`}>
+                        <Icon size={18} />
+                      </div>
+                      {trend === 'up' ? (
+                        <ArrowUpRight size={16} className="text-emerald-500 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+                      ) : trend === 'down' ? (
+                        <ArrowDownRight size={16} className="text-rose-400 transition-transform group-hover:translate-x-0.5 group-hover:translate-y-0.5" />
+                      ) : (
+                        <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
+                      )}
+                    </div>
+                    <p className="text-[12px] font-medium text-slate-500 group-hover:text-[#426759] transition-colors">{label}</p>
+                    <div className="mt-1 flex items-end justify-between">
+                      <span className="text-2xl font-bold tracking-tight text-slate-900">{value}</span>
+                      <span className={`text-[10px] font-medium ${trend === 'up' ? 'text-emerald-600' : trend === 'down' ? 'text-rose-500' : 'text-slate-400'}`}>
+                        {note}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </section>
 
-            <section className="mb-7 grid grid-cols-1 gap-5 xl:grid-cols-[1.6fr_1fr]"><div className="rounded-xl border border-slate-200 bg-white p-5 sm:p-6"><div className="mb-6 flex items-center justify-between"><div><h3 className="text-sm font-bold text-slate-900">Employee lifecycle overview</h3><p className="mt-1 text-xs text-slate-400">Current workforce distribution by stage</p></div><button className="text-xs font-semibold text-indigo-600 hover:text-indigo-700">View details <ChevronRight size={13} className="inline" /></button></div><div className="relative grid grid-cols-5 gap-1">{lifecycleStages.map(([stage, amount, bg, color], index) => <div key={stage} className="relative text-center"><div className={`mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full ${bg} ${color} text-lg font-bold ring-4 ring-white sm:h-16 sm:w-16`}>{amount}</div>{index < 4 && <div className="absolute left-[calc(50%+34px)] top-7 hidden h-px w-[calc(100%-52px)] bg-slate-200 sm:block" />}<p className="text-[10px] font-semibold text-slate-600 sm:text-[11px]">{stage}</p><p className="mt-1 text-[10px] text-slate-400">{index === 2 ? 'employees' : 'people'}</p></div>)}</div><div className="mt-7 flex items-center justify-between rounded-lg bg-slate-50 px-4 py-3"><div className="flex items-center gap-2"><div className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-100 text-emerald-600"><Check size={14} /></div><span className="text-xs font-medium text-slate-600">Lifecycle health is looking good</span></div><span className="text-xs font-bold text-emerald-600">{Math.round((employeeRecords.filter((employee) => employee.status === 'Active').length / Math.max(1, totalEmployees)) * 100)}% on track</span></div></div><div className="rounded-xl border border-slate-200 bg-white p-5 sm:p-6"><div className="mb-5 flex items-center justify-between"><div><h3 className="text-sm font-bold text-slate-900">Quick actions</h3><p className="mt-1 text-xs text-slate-400">Common HR workflows</p></div><MoreHorizontal size={17} className="text-slate-400" /></div><div className="grid grid-cols-2 gap-2.5">{[[UserPlus, 'Add employee', 'Create profile'], [ClipboardCheck, 'Start onboarding', 'Begin a workflow'], [Archive, 'Initiate relieving', 'Start exit process'], [FileText, 'Upload template', 'Add a document'], [Activity, 'Generate report', 'View insights'], [CalendarDays, 'View calendar', 'Upcoming events']].map(([Icon, title, subtitle]) => <button key={title} onClick={() => showToast(`${title} selected`)} className="group rounded-lg border border-slate-100 bg-slate-50 p-3 text-left transition hover:border-indigo-200 hover:bg-indigo-50"><Icon size={17} className="mb-2 text-indigo-600" /><p className="text-[11px] font-semibold text-slate-700 group-hover:text-indigo-700">{title}</p><p className="mt-0.5 text-[10px] text-slate-400">{subtitle}</p></button>)}</div></div></section>
+            <section className="mb-7 grid grid-cols-1 gap-5 xl:grid-cols-[1.6fr_1fr]"><div className="rounded-xl border border-slate-200 bg-white p-5 sm:p-6"><div className="mb-6 flex items-center justify-between"><div><h3 className="text-sm font-bold text-slate-900">Employee lifecycle overview</h3><p className="mt-1 text-xs text-slate-400">Current workforce distribution by stage</p></div><button className="text-xs font-semibold text-indigo-600 hover:text-indigo-700">View details <ChevronRight size={13} className="inline" /></button></div><div className="relative grid grid-cols-5 gap-1">{lifecycleStages.map(([stage, amount, bg, color], index) => <div key={stage} className="relative text-center"><div className={`mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full ${bg} ${color} text-lg font-bold ring-4 ring-white sm:h-16 sm:w-16`}>{amount}</div>{index < 4 && <div className="absolute left-[calc(50%+34px)] top-7 hidden h-px w-[calc(100%-52px)] bg-slate-200 sm:block" />}<p className="text-[10px] font-semibold text-slate-600 sm:text-[11px]">{stage}</p><p className="mt-1 text-[10px] text-slate-400">{index === 2 ? 'employees' : 'people'}</p></div>)}</div><div className="mt-7 flex items-center justify-between rounded-lg bg-slate-50 px-4 py-3"><div className="flex items-center gap-2"><div className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-100 text-emerald-600"><Check size={14} /></div><span className="text-xs font-medium text-slate-600">Lifecycle health is looking good</span></div><span className="text-xs font-bold text-emerald-600">{Math.round((employeeRecords.filter((employee) => employee.status === 'Active').length / Math.max(1, totalEmployees)) * 100)}% on track</span></div></div><div className="rounded-xl border border-slate-200 bg-white p-5 sm:p-6"><div className="mb-5 flex items-center justify-between"><div><h3 className="text-sm font-bold text-slate-900">Quick actions</h3><p className="mt-1 text-xs text-slate-400">Common HR workflows</p></div></div><div className="grid grid-cols-2 gap-2.5">{[[UserPlus, 'Add employee', 'Create profile'], [ClipboardCheck, 'Start onboarding', 'Begin a workflow'], [Archive, 'Initiate relieving', 'Start exit process'], [FileText, 'Upload template', 'Add a document'], [Activity, 'Generate report', 'View insights'], [CalendarDays, 'View calendar', 'Upcoming events']].map(([Icon, title, subtitle]) => <button key={title} onClick={() => handleQuickAction(title)} className="group rounded-lg border border-slate-100 bg-slate-50 p-3 text-left transition hover:border-[#b9d0c1] hover:bg-[#edf3ef] cursor-pointer"><Icon size={17} className="mb-2 text-[#426759]" /><p className="text-[11px] font-semibold text-slate-700 group-hover:text-[#426759]">{title}</p><p className="mt-0.5 text-[10px] text-slate-400">{subtitle}</p></button>)}</div></div></section>
+              <section className="mb-7 rounded-xl border border-slate-200 bg-white">
+                <div className="flex flex-col justify-between gap-3 border-b border-slate-100 p-5 sm:flex-row sm:items-center sm:p-6">
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-900">Recent onboarding</h3>
+                    <p className="mt-1 text-xs text-slate-400">Track your newest team members</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <button 
+                      onClick={() => {
+                        const filters = ['All', 'In Progress', 'Completed', 'Pending']
+                        const currentIdx = filters.indexOf(onboardingFilter)
+                        const nextFilter = filters[(currentIdx + 1) % filters.length]
+                        setOnboardingFilter(nextFilter)
+                        showToast(`Filter: ${nextFilter}`)
+                      }}
+                      className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-[11px] font-semibold transition cursor-pointer ${
+                        onboardingFilter !== 'All' ? 'bg-[#edf3ef] border-[#b9d0c1] text-[#426759]' : 'border-slate-200 text-slate-600 hover:border-slate-300'
+                      }`}
+                    >
+                      <Filter size={14} />
+                      <span>Filter{onboardingFilter !== 'All' ? `: ${onboardingFilter}` : ''}</span>
+                    </button>
+                    <button 
+                      onClick={() => setActivePage('Onboarding')}
+                      className="text-xs font-semibold text-indigo-600 hover:text-indigo-700 transition cursor-pointer flex items-center gap-1"
+                    >
+                      <span>View all</span>
+                      <ChevronRight size={13} />
+                    </button>
+                  </div>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[760px] text-left">
+                    <thead className="bg-slate-50/70 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                      <tr>
+                        <th className="px-6 py-3 font-semibold">Employee</th>
+                        <th className="px-4 py-3 font-semibold">Department</th>
+                        <th className="px-4 py-3 font-semibold">Joining date</th>
+                        <th className="px-4 py-3 font-semibold">Progress</th>
+                        <th className="px-4 py-3 font-semibold">Documents</th>
+                        <th className="px-4 py-3 font-semibold">Status</th>
+                        <th className="px-4 py-3" />
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {filteredEmployees.map((employee) => (
+                        <tr 
+                          key={employee.name} 
+                          onClick={() => {
+                            setSelectedOnboardingName(employee.name);
+                            setActivePage('Onboarding');
+                          }}
+                          className="transition hover:bg-[#edf3ef]/50 cursor-pointer"
+                        >
+                          <td className="px-6 py-3.5">
+                            <div className="flex items-center gap-3">
+                              <div className={`flex h-8 w-8 items-center justify-center rounded-full text-[10px] font-bold ${employee.color}`}>
+                                {employee.initials}
+                              </div>
+                              <span className="text-xs font-semibold text-slate-700">{employee.name}</span>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3.5 text-xs text-slate-500">{employee.department}</td>
+                          <td className="px-4 py-3.5 text-xs text-slate-500">{employee.date}</td>
+                          <td className="px-4 py-3.5">
+                            <div className="flex items-center gap-2">
+                              <div className="h-1.5 w-16 overflow-hidden rounded-full bg-slate-100">
+                                <div className={`h-full rounded-full ${employee.progress === 100 ? 'bg-emerald-500' : 'bg-indigo-500'}`} style={{ width: `${employee.progress}%` }} />
+                              </div>
+                              <span className="text-[10px] font-semibold text-slate-500">{employee.progress}%</span>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3.5 text-xs font-medium text-slate-500">{employee.docs}</td>
+                          <td className="px-4 py-3.5">
+                            <StatusBadge status={employee.status} />
+                          </td>
+                          <td className="px-4 py-3.5 relative" onClick={(e) => e.stopPropagation()}>
+                            <button 
+                              onClick={() => setActiveOnboardingRowMenu(activeOnboardingRowMenu === employee.name ? null : employee.name)}
+                              className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition cursor-pointer"
+                            >
+                              <MoreHorizontal size={16} />
+                            </button>
+                            {activeOnboardingRowMenu === employee.name && (
+                              <div className="absolute right-4 top-10 z-30 w-36 rounded-xl border border-slate-100 bg-white py-1 shadow-lg ring-1 ring-slate-900/5 text-left text-xs font-medium text-slate-700">
+                                <button 
+                                  onClick={() => {
+                                    setSelectedOnboardingName(employee.name);
+                                    setActivePage('Onboarding');
+                                    setActiveOnboardingRowMenu(null);
+                                  }}
+                                  className="w-full px-3 py-1.5 hover:bg-slate-50 text-left transition cursor-pointer"
+                                >
+                                  View Details
+                                </button>
+                                <button 
+                                  onClick={() => {
+                                    showToast(`Onboarding reminder sent to ${employee.name}`);
+                                    setActiveOnboardingRowMenu(null);
+                                  }}
+                                  className="w-full px-3 py-1.5 hover:bg-slate-50 text-left transition cursor-pointer"
+                                >
+                                  Send Reminder
+                                </button>
+                              </div>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </section>
 
-              <section className="mb-7 rounded-xl border border-slate-200 bg-white"><div className="flex flex-col justify-between gap-3 border-b border-slate-100 p-5 sm:flex-row sm:items-center sm:p-6"><div><h3 className="text-sm font-bold text-slate-900">Recent onboarding</h3><p className="mt-1 text-xs text-slate-400">Track your newest team members</p></div><div className="flex gap-2"><button className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-[11px] font-semibold text-slate-600"><Filter size={14} />Filter</button><button className="text-xs font-semibold text-indigo-600">View all <ChevronRight size={13} className="inline" /></button></div></div><div className="overflow-x-auto"><table className="w-full min-w-[760px] text-left"><thead className="bg-slate-50/70 text-[10px] font-semibold uppercase tracking-wider text-slate-400"><tr><th className="px-6 py-3 font-semibold">Employee</th><th className="px-4 py-3 font-semibold">Department</th><th className="px-4 py-3 font-semibold">Joining date</th><th className="px-4 py-3 font-semibold">Progress</th><th className="px-4 py-3 font-semibold">Documents</th><th className="px-4 py-3 font-semibold">Status</th><th className="px-4 py-3" /></tr></thead><tbody className="divide-y divide-slate-100">{filteredEmployees.map((employee) => <tr key={employee.name} className="transition hover:bg-slate-50/70"><td className="px-6 py-3.5"><div className="flex items-center gap-3"><div className={`flex h-8 w-8 items-center justify-center rounded-full text-[10px] font-bold ${employee.color}`}>{employee.initials}</div><span className="text-xs font-semibold text-slate-700">{employee.name}</span></div></td><td className="px-4 py-3.5 text-xs text-slate-500">{employee.department}</td><td className="px-4 py-3.5 text-xs text-slate-500">{employee.date}</td><td className="px-4 py-3.5"><div className="flex items-center gap-2"><div className="h-1.5 w-16 overflow-hidden rounded-full bg-slate-100"><div className={`h-full rounded-full ${employee.progress === 100 ? 'bg-emerald-500' : 'bg-indigo-500'}`} style={{ width: `${employee.progress}%` }} /></div><span className="text-[10px] font-semibold text-slate-500">{employee.progress}%</span></div></td><td className="px-4 py-3.5 text-xs font-medium text-slate-500">{employee.docs}</td><td className="px-4 py-3.5"><StatusBadge status={employee.status} /></td><td className="px-4 py-3.5"><button className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"><MoreHorizontal size={16} /></button></td></tr>)}</tbody></table></div></section>
-
-              <section className="mb-7 grid grid-cols-1 gap-5 xl:grid-cols-[1.35fr_1fr]"><div className="rounded-xl border border-slate-200 bg-white p-5 sm:p-6"><div className="mb-5 flex items-center justify-between"><div><h3 className="text-sm font-bold text-slate-900">Employee growth</h3><p className="mt-1 text-xs text-slate-400">Total headcount over the last 6 months</p></div><button className="flex items-center gap-1 text-[11px] font-semibold text-slate-500">Last 6 months <ChevronDown size={13} /></button></div><div className="flex h-44 items-end gap-3 border-b border-l border-slate-100 px-3 pb-0 pt-5 sm:gap-7"><div className="flex h-full flex-1 flex-col justify-between pb-5 text-[9px] text-slate-300"><span>260</span><span>240</span><span>220</span><span>200</span></div><div className="relative flex h-full flex-1 items-end justify-between gap-2 pb-5"><div className="absolute inset-x-0 top-[23%] border-t border-dashed border-slate-100" /><div className="absolute inset-x-0 top-[54%] border-t border-dashed border-slate-100" /><div className="absolute inset-x-0 top-[85%] border-t border-dashed border-slate-100" /><svg className="absolute inset-0 h-[calc(100%-20px)] w-full overflow-visible" viewBox="0 0 500 120" preserveAspectRatio="none"><defs><linearGradient id="area" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stopColor="#426759" stopOpacity=".18" /><stop offset="1" stopColor="#426759" stopOpacity="0" /></linearGradient></defs><path d="M0,100 C60,95 70,76 120,82 S185,57 230,67 S295,43 335,50 S405,22 500,28 L500,120 L0,120Z" fill="url(#area)" /><path d="M0,100 C60,95 70,76 120,82 S185,57 230,67 S295,43 335,50 S405,22 500,28" fill="none" stroke="#426759" strokeLinecap="round" strokeWidth="3" /></svg>{['Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug'].map((month) => <span key={month} className="z-10 translate-y-5 text-[9px] text-slate-400">{month}</span>)}</div></div></div><div className="rounded-xl border border-slate-200 bg-white p-5 sm:p-6"><div className="mb-4 flex items-center justify-between"><div><h3 className="text-sm font-bold text-slate-900">Onboarding status</h3><p className="mt-1 text-xs text-slate-400">Current workflow split</p></div><MoreHorizontal size={17} className="text-slate-400" /></div><div className="flex items-center gap-7"><div className="relative h-32 w-32 shrink-0 rounded-full" style={{ background: 'conic-gradient(#10b981 0 52%, #426759 52% 79%, #fbbf24 79% 100%)' }}><div className="absolute inset-[14px] flex flex-col items-center justify-center rounded-full bg-white"><span className="text-2xl font-bold text-slate-900">24</span><span className="text-[10px] text-slate-400">total</span></div></div><div className="space-y-3 text-xs"><div className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-emerald-500" /><span className="text-slate-500">Completed</span><b className="ml-3 text-slate-700">12</b></div><div className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-indigo-500" /><span className="text-slate-500">In progress</span><b className="ml-3 text-slate-700">6</b></div><div className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-amber-400" /><span className="text-slate-500">Pending</span><b className="ml-3 text-slate-700">6</b></div></div></div></div></section>
+              <section className="mb-7 grid grid-cols-1 gap-5 xl:grid-cols-[1.35fr_1fr]"><div className="rounded-xl border border-slate-200 bg-white p-5 sm:p-6"><div className="mb-5 flex items-center justify-between"><div><h3 className="text-sm font-bold text-slate-900">Employee growth</h3><p className="mt-1 text-xs text-slate-400">Total headcount over the {growthTimeframe.toLowerCase()}</p></div><div className="relative"><button onClick={() => setShowGrowthTimeframeMenu(!showGrowthTimeframeMenu)} className="flex items-center gap-1 text-[11px] font-semibold text-slate-500 hover:text-slate-700 transition cursor-pointer">{growthTimeframe} <ChevronDown size={13} /></button>{showGrowthTimeframeMenu && <div className="absolute right-0 top-6 z-30 w-36 rounded-xl border border-slate-100 bg-white py-1 shadow-lg text-left text-xs font-semibold text-slate-600"><button onClick={() => { setGrowthTimeframe('Last 3 months'); setShowGrowthTimeframeMenu(false); showToast('Timeframe set to Last 3 months'); }} className="w-full px-3 py-1.5 hover:bg-slate-50 text-left cursor-pointer transition">Last 3 months</button><button onClick={() => { setGrowthTimeframe('Last 6 months'); setShowGrowthTimeframeMenu(false); showToast('Timeframe set to Last 6 months'); }} className="w-full px-3 py-1.5 hover:bg-slate-50 text-left cursor-pointer transition">Last 6 months</button><button onClick={() => { setGrowthTimeframe('Last 12 months'); setShowGrowthTimeframeMenu(false); showToast('Timeframe set to Last 12 months'); }} className="w-full px-3 py-1.5 hover:bg-slate-50 text-left cursor-pointer transition">Last 12 months</button></div>}</div></div><div className="flex h-44 items-end gap-3 border-b border-l border-slate-100 px-3 pb-0 pt-5 sm:gap-7"><div className="flex h-full flex-1 flex-col justify-between pb-5 text-[9px] text-slate-300"><span>260</span><span>240</span><span>220</span><span>200</span></div><div className="relative flex h-full flex-1 items-end justify-between gap-2 pb-5"><div className="absolute inset-x-0 top-[23%] border-t border-dashed border-slate-100" /><div className="absolute inset-x-0 top-[54%] border-t border-dashed border-slate-100" /><div className="absolute inset-x-0 top-[85%] border-t border-dashed border-slate-100" /><svg className="absolute inset-0 h-[calc(100%-20px)] w-full overflow-visible" viewBox="0 0 500 120" preserveAspectRatio="none"><defs><linearGradient id="area" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stopColor="#426759" stopOpacity=".18" /><stop offset="1" stopColor="#426759" stopOpacity="0" /></linearGradient></defs><path d={growthPaths.areaPath} fill="url(#area)" className="transition-all duration-300" /><path d={growthPaths.curvePath} fill="none" stroke="#426759" strokeLinecap="round" strokeWidth="3" className="transition-all duration-300" /></svg>{growthConfig.months.map((month) => <span key={month} className="z-10 translate-y-5 text-[9px] text-slate-400">{month}</span>)}</div></div></div><div className="rounded-xl border border-slate-200 bg-white p-5 sm:p-6"><div className="mb-4 flex items-center justify-between"><div><h3 className="text-sm font-bold text-slate-900">Onboarding status</h3><p className="mt-1 text-xs text-slate-400">Current workflow split</p></div><div className="relative"><button onClick={() => setShowOnboardingStatusMenu(!showOnboardingStatusMenu)} className="p-1 rounded hover:bg-slate-50 text-slate-400 hover:text-slate-600 transition cursor-pointer" title="Onboarding Status Options"><MoreHorizontal size={17} /></button>{showOnboardingStatusMenu && <div className="absolute right-0 top-6 z-30 w-44 rounded-xl border border-slate-100 bg-white py-1 shadow-lg text-left text-xs font-semibold text-slate-600"><button onClick={() => { setActivePage('Reports'); setShowOnboardingStatusMenu(false); }} className="w-full px-3 py-1.5 hover:bg-slate-50 text-left cursor-pointer transition">View Detailed Report</button><button onClick={() => { setActivePage('Onboarding'); localStorage.setItem('empflow-auto-initiate-onboarding', 'true'); setShowOnboardingStatusMenu(false); }} className="w-full px-3 py-1.5 hover:bg-slate-50 text-left cursor-pointer transition">Add New Candidate</button><button onClick={() => { showToast('Summary CSV downloaded'); setShowOnboardingStatusMenu(false); }} className="w-full px-3 py-1.5 hover:bg-slate-50 text-left cursor-pointer transition">Download CSV Summary</button></div>}</div></div><div className="flex items-center gap-7"><div className="relative h-32 w-32 shrink-0 rounded-full" style={{ background: 'conic-gradient(#10b981 0 52%, #426759 52% 79%, #fbbf24 79% 100%)' }}><div className="absolute inset-[14px] flex flex-col items-center justify-center rounded-full bg-white"><span className="text-2xl font-bold text-slate-900">24</span><span className="text-[10px] text-slate-400">total</span></div></div><div className="space-y-3 text-xs"><div className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-emerald-500" /><span className="text-slate-500">Completed</span><b className="ml-3 text-slate-700">12</b></div><div className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-indigo-500" /><span className="text-slate-500">In progress</span><b className="ml-3 text-slate-700">6</b></div><div className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-amber-400" /><span className="text-slate-500">Pending</span><b className="ml-3 text-slate-700">6</b></div></div></div></div></section>
 
               <section className="grid grid-cols-1 gap-5 xl:grid-cols-[1.2fr_1fr]">
                 <div className="rounded-xl border border-slate-200 bg-white">
                   <div className="flex items-center justify-between border-b border-slate-100 p-5 sm:p-6">
                     <div><h3 className="text-sm font-bold text-slate-900">Upcoming relieving</h3><p className="mt-1 text-xs text-slate-400">Employees exiting soon</p></div>
-                    <button className="text-xs font-semibold text-indigo-600">View all <ChevronRight size={13} className="inline" /></button>
+                    <button 
+                      onClick={() => setActivePage('Offboarding')}
+                      className="text-xs font-semibold text-indigo-600 hover:text-indigo-700 transition cursor-pointer flex items-center gap-1"
+                    >
+                      <span>View all</span>
+                      <ChevronRight size={13} />
+                    </button>
                   </div>
                   <div className="divide-y divide-slate-100">
                     {offboardings.slice(-3).map((process) => (
-                      <div key={process.id} className="flex items-center justify-between gap-3 px-5 py-4">
+                      <div 
+                        key={process.id} 
+                        onClick={() => setActivePage('Offboarding')}
+                        className="flex items-center justify-between gap-3 px-5 py-4 hover:bg-[#edf3ef]/30 cursor-pointer transition"
+                      >
                         <div className="flex items-center gap-3">
                           <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-[10px] font-bold text-slate-600">
                             {process.employee_name ? process.employee_name.split(' ').map((n) => n[0]).join('') : 'EE'}
@@ -877,13 +1119,473 @@ function App() {
                     ))}
                   </div>
                 </div>
-                <div className="rounded-xl border border-slate-200 bg-white p-5 sm:p-6"><div className="mb-4 flex items-center justify-between"><div><h3 className="text-sm font-bold text-slate-900">Pending tasks</h3><p className="mt-1 text-xs text-slate-400">Your attention is needed</p></div><span className="rounded-full bg-rose-50 px-2 py-1 text-[10px] font-semibold text-rose-600">4 open</span></div><div className="space-y-3">{tasks.map(({ icon: Icon, title, meta, priority, tone }) => <div key={title} className="flex items-center gap-3 rounded-lg border border-slate-100 p-3"><div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${tone === 'rose' ? 'bg-rose-50 text-rose-500' : tone === 'amber' ? 'bg-amber-50 text-amber-600' : 'bg-indigo-50 text-indigo-600'}`}><Icon size={15} /></div><div className="min-w-0 flex-1"><p className="truncate text-[11px] font-semibold text-slate-700">{title}</p><p className="mt-0.5 truncate text-[10px] text-slate-400">{meta}</p></div><span className="hidden text-[10px] font-semibold text-slate-400 sm:block">{priority}</span><button onClick={() => showToast('Task marked for review')} className="rounded-md border border-slate-200 px-2 py-1 text-[10px] font-semibold text-slate-600 hover:border-indigo-200 hover:text-indigo-600">Review</button></div>)}</div></div>
+                <div className="rounded-xl border border-slate-200 bg-white p-5 sm:p-6"><div className="mb-4 flex items-center justify-between"><div><h3 className="text-sm font-bold text-slate-900">Pending tasks</h3><p className="mt-1 text-xs text-slate-400">Your attention is needed</p></div><span className="rounded-full bg-rose-50 px-2 py-1 text-[10px] font-semibold text-rose-600">4 open</span></div><div className="space-y-3">{tasks.map(({ icon: Icon, title, meta, priority, tone }) => <div key={title} className="flex items-center gap-3 rounded-lg border border-slate-100 p-3"><div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${tone === 'rose' ? 'bg-rose-50 text-rose-500' : tone === 'amber' ? 'bg-amber-50 text-amber-600' : 'bg-indigo-50 text-indigo-600'}`}><Icon size={15} /></div><div className="min-w-0 flex-1"><p className="truncate text-[11px] font-semibold text-slate-700">{title}</p><p className="mt-0.5 truncate text-[10px] text-slate-400">{meta}</p></div><span className="hidden text-[10px] font-semibold text-slate-400 sm:block">{priority}</span><button onClick={() => { if (title === 'Onboarding documents awaiting approval') { setActivePage('Onboarding'); } else if (title === 'Employee documents missing') { setActivePage('Employees'); } else if (title === 'Exit clearances pending') { setActivePage('Offboarding'); } else { setActivePage('Reports'); } showToast(`Navigated to review: ${title}`); }} className="rounded-md border border-slate-200 px-2 py-1 text-[10px] font-semibold text-slate-600 hover:border-indigo-200 hover:text-indigo-600 cursor-pointer transition">Review</button></div>)}</div></div>
               </section>
             </>
           )}
         </div>
       </main>
       {toast && <div className="fixed bottom-5 right-5 z-50 flex items-center gap-2 rounded-lg bg-slate-900 px-4 py-3 text-xs font-medium text-white shadow-xl"><Check size={15} className="text-emerald-400" />{toast}<button onClick={() => setToast('')} className="ml-2 text-slate-400 hover:text-white"><X size={14} /></button></div>}
+
+      {showAddEmployeeModal && (
+        <AddEmployeeModal 
+          departments={departments}
+          designations={designations}
+          onClose={() => setShowAddEmployeeModal(false)}
+          onAdd={(newEmp) => {
+            const updated = [...employeeRecordsState, newEmp]
+            setEmployeeRecordsState(updated)
+            localStorage.setItem('empflow-employees', JSON.stringify(updated))
+            
+            // Generate notification
+            const notifId = 'notif_add_' + Date.now();
+            const newNotif = {
+              id: notifId,
+              type: 'EMPLOYEE_ADDED',
+              employeeId: `EMP-${newEmp.id.slice(1).padStart(3, '0')}`,
+              employeeName: newEmp.name,
+              uploadedAt: new Date().toISOString(),
+              targetRoles: ['ADMIN', 'HR'],
+              message: `A new employee profile was added for "${newEmp.name}".`,
+              readBy: []
+            }
+            const savedNotifs = localStorage.getItem('empflow-notifications')
+            const notificationsList = savedNotifs ? JSON.parse(savedNotifs) : []
+            notificationsList.unshift(newNotif)
+            localStorage.setItem('empflow-notifications', JSON.stringify(notificationsList))
+
+            // Audit Log
+            const auditId = 'l_' + Date.now();
+            const newAudit = {
+              id: auditId,
+              action: `${currentUser.role} added employee "${newEmp.name}"`,
+              timestamp: new Date().toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' }) + `, ` + new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false }),
+              user: currentUser.name,
+              employeeId: `EMP-${newEmp.id.slice(1).padStart(3, '0')}`
+            }
+            const savedAudits = localStorage.getItem('empflow-audit-logs')
+            const audits = savedAudits ? JSON.parse(savedAudits) : []
+            audits.unshift(newAudit)
+            localStorage.setItem('empflow-audit-logs', JSON.stringify(audits))
+
+            showToast(`Employee "${newEmp.name}" added successfully`)
+            window.dispatchEvent(new Event('storage'))
+            setShowAddEmployeeModal(false)
+          }}
+        />
+      )}
+
+      {showInitiateOffboardingModal && (
+        <InitiateOffboardingModal 
+          employees={employeeRecordsState}
+          offboardings={offboardings}
+          departments={departments}
+          onClose={() => setShowInitiateOffboardingModal(false)}
+          onInitiate={(newProcess) => {
+            const updated = [newProcess, ...offboardings]
+            setOffboardings(updated)
+            localStorage.setItem('empflow-offboardings', JSON.stringify(updated))
+            
+            // Also update employee status to 'Offboarding'
+            const updatedEmps = employeeRecordsState.map(emp => {
+              if (emp.id === newProcess.employee_id) {
+                return { ...emp, status: 'Offboarding' }
+              }
+              return emp
+            })
+            setEmployeeRecordsState(updatedEmps)
+            localStorage.setItem('empflow-employees', JSON.stringify(updatedEmps))
+
+            // Add notification
+            const notifId = 'notif_off_' + Date.now();
+            const newNotif = {
+              id: notifId,
+              type: 'OFFBOARDING_INITIATED',
+              employeeId: newProcess.employee_id,
+              employeeName: newProcess.employee_name,
+              uploadedAt: new Date().toISOString(),
+              targetRoles: ['ADMIN', 'HR'],
+              message: `Exit process initiated for "${newProcess.employee_name}".`,
+              readBy: []
+            }
+            const savedNotifs = localStorage.getItem('empflow-notifications')
+            const notificationsList = savedNotifs ? JSON.parse(savedNotifs) : []
+            notificationsList.unshift(newNotif)
+            localStorage.setItem('empflow-notifications', JSON.stringify(notificationsList))
+
+            // Audit Log
+            const auditId = 'l_' + Date.now();
+            const newAudit = {
+              id: auditId,
+              action: `${currentUser.role} initiated offboarding for "${newProcess.employee_name}"`,
+              timestamp: new Date().toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' }) + `, ` + new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false }),
+              user: currentUser.name,
+              employeeId: newProcess.employee_id
+            }
+            const savedAudits = localStorage.getItem('empflow-audit-logs')
+            const audits = savedAudits ? JSON.parse(savedAudits) : []
+            audits.unshift(newAudit)
+            localStorage.setItem('empflow-audit-logs', JSON.stringify(audits))
+
+            showToast(`Exit process initiated for ${newProcess.employee_name}`)
+            window.dispatchEvent(new Event('storage'))
+            setShowInitiateOffboardingModal(false)
+          }}
+        />
+      )}
+
+      {showCalendarModal && (
+        <CalendarModal 
+          onClose={() => setShowCalendarModal(false)}
+        />
+      )}
+    </div>
+  )
+}
+
+function AddEmployeeModal({ departments, designations, onClose, onAdd }) {
+  const [name, setName] = useState('')
+  const [email, setEmail] = useState('')
+  const [deptId, setDeptId] = useState(departments[0]?.id || 'd1')
+  const [desigId, setDesigId] = useState(designations[0]?.id || 'de1')
+
+  const handleSubmit = (e) => {
+    e.preventDefault()
+    if (!name.trim() || !email.trim()) return
+    
+    const id = 'e' + Date.now()
+    const newEmp = {
+      id,
+      name: name.trim(),
+      email: email.trim(),
+      department_id: deptId,
+      designation_id: desigId,
+      status: 'Active',
+      color: 'bg-indigo-50 text-indigo-700',
+      initials: name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
+    }
+    onAdd(newEmp)
+  }
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/30 p-4 backdrop-blur-[2px]" onClick={onClose}>
+      <form onSubmit={handleSubmit} className="w-full max-w-md rounded-xl border border-slate-200 bg-white p-6 shadow-2xl space-y-4 text-left" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+          <h4 className="text-sm font-bold text-slate-800">Add New Employee</h4>
+          <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-600 font-bold text-lg">×</button>
+        </div>
+        
+        <div className="space-y-3.5 text-xs">
+          <div>
+            <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Full Name</label>
+            <input 
+              type="text" 
+              required 
+              value={name} 
+              onChange={e => setName(e.target.value)}
+              placeholder="e.g. Aditi Deshmukh" 
+              className="h-10 w-full rounded-xl border border-slate-200 px-3 outline-none focus:border-[#426759]"
+            />
+          </div>
+          <div>
+            <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Email Address</label>
+            <input 
+              type="email" 
+              required 
+              value={email} 
+              onChange={e => setEmail(e.target.value)}
+              placeholder="e.g. aditi@empflow.local" 
+              className="h-10 w-full rounded-xl border border-slate-200 px-3 outline-none focus:border-[#426759]"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Department</label>
+              <select 
+                value={deptId} 
+                onChange={e => setDeptId(e.target.value)}
+                className="h-10 w-full rounded-xl border border-slate-200 px-2 outline-none focus:border-[#426759]"
+              >
+                {departments.map(d => (
+                  <option key={d.id} value={d.id}>{d.name}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Designation</label>
+              <select 
+                value={desigId} 
+                onChange={e => setDesigId(e.target.value)}
+                className="h-10 w-full rounded-xl border border-slate-200 px-2 outline-none focus:border-[#426759]"
+              >
+                {designations.map(d => (
+                  <option key={d.id} value={d.id}>{d.title}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex justify-end gap-2.5 pt-3 border-t border-slate-100">
+          <button type="button" onClick={onClose} className="px-4 py-2.5 text-xs font-semibold text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50 cursor-pointer">Cancel</button>
+          <button type="submit" className="px-4 py-2.5 text-xs font-semibold text-white bg-[#426759] rounded-lg hover:bg-[#315447] cursor-pointer">Save Employee</button>
+        </div>
+      </form>
+    </div>
+  )
+}
+
+function InitiateOffboardingModal({ employees, offboardings, departments, onClose, onInitiate }) {
+  const eligibleEmployees = employees.filter(emp => {
+    const isExiting = offboardings.some(o => o.employee_id === emp.id || o.employee_id === emp.employeeId)
+    return emp.status !== 'Offboarding' && !isExiting
+  })
+
+  const [selectedEmpId, setSelectedEmpId] = useState(eligibleEmployees[0]?.id || '')
+  const [lastWorkingDate, setLastWorkingDate] = useState(() => {
+    const today = new Date()
+    today.setDate(today.getDate() + 30)
+    return today.toISOString().split('T')[0]
+  })
+
+  const handleSubmit = (e) => {
+    e.preventDefault()
+    const employee = employees.find(emp => emp.id === selectedEmpId)
+    if (!employee) return
+
+    const newProcess = {
+      id: 'fp_' + Date.now(),
+      employee_id: employee.id,
+      employee_name: employee.name,
+      department: departments.find(d => d.id === employee.department_id)?.name || 'Engineering',
+      last_working_date: lastWorkingDate,
+      status: 'Pending',
+      tasks: [
+        { name: 'Asset Return', status: 'Pending' },
+        { name: 'Knowledge Transfer', status: 'Pending' },
+        { name: 'Access Revocation', status: 'Pending' },
+        { name: 'Exit Interview', status: 'Pending' },
+        { name: 'Final Settlement', status: 'Pending' }
+      ]
+    }
+    onInitiate(newProcess)
+  }
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/30 p-4 backdrop-blur-[2px]" onClick={onClose}>
+      <form onSubmit={handleSubmit} className="w-full max-w-md rounded-xl border border-slate-200 bg-white p-6 shadow-2xl space-y-4 text-left" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+          <h4 className="text-sm font-bold text-slate-800">Initiate Exit Process</h4>
+          <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-600 font-bold text-lg">×</button>
+        </div>
+        
+        {eligibleEmployees.length === 0 ? (
+          <div className="py-6 text-center text-xs text-slate-500">
+            No active employees available to offboard.
+          </div>
+        ) : (
+          <div className="space-y-4 text-xs">
+            <div>
+              <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Select Employee</label>
+              <select 
+                value={selectedEmpId} 
+                onChange={e => setSelectedEmpId(e.target.value)}
+                className="h-10 w-full rounded-xl border border-slate-200 px-3 outline-none focus:border-[#426759]"
+              >
+                {eligibleEmployees.map(emp => (
+                  <option key={emp.id} value={emp.id}>{emp.name} (ID: EMP-{emp.id.slice(1).padStart(3, '0')})</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Last Working Date</label>
+              <input 
+                type="date" 
+                required 
+                value={lastWorkingDate} 
+                onChange={e => setLastWorkingDate(e.target.value)}
+                className="h-10 w-full rounded-xl border border-slate-200 px-3 outline-none focus:border-[#426759]"
+              />
+            </div>
+          </div>
+        )}
+
+        <div className="flex justify-end gap-2.5 pt-3 border-t border-slate-100">
+          <button type="button" onClick={onClose} className="px-4 py-2.5 text-xs font-semibold text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50 cursor-pointer">Cancel</button>
+          <button 
+            type="submit" 
+            disabled={eligibleEmployees.length === 0}
+            className="px-4 py-2.5 text-xs font-semibold text-white bg-[#426759] rounded-lg hover:bg-[#315447] disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+          >
+            Initiate Offboarding
+          </button>
+        </div>
+      </form>
+    </div>
+  )
+}
+
+function CalendarModal({ onClose }) {
+  const daysInMonth = Array.from({ length: 31 }, (_, i) => i + 1)
+  const events = [
+    { day: 12, type: 'onboarding', title: 'Rahul Sharma joins', subtitle: 'Software Engineering Team', time: '09:30 AM' },
+    { day: 28, type: 'offboarding', title: 'Sneha Iyer Last Day', subtitle: 'Product Design clearance', time: '06:00 PM' },
+    { day: 29, type: 'offboarding', title: 'Manoj Kumar Last Day', subtitle: 'QA Engineering handover', time: '06:00 PM' },
+  ]
+
+  const [selectedDay, setSelectedDay] = useState(12)
+  const activeEvents = events.filter(e => e.day === selectedDay)
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm" onClick={onClose}>
+      <div 
+        className="w-full max-w-xl rounded-2xl border border-white/60 bg-white/90 p-6 shadow-[0_20px_50px_rgba(15,23,42,0.15)] backdrop-blur-md space-y-5 text-left transform transition-all duration-300 scale-100"
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-start justify-between pb-3 border-b border-slate-100">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#edf3ef] text-[#426759]">
+              <CalendarDays size={20} />
+            </div>
+            <div>
+              <h4 className="text-base font-bold text-slate-800 tracking-tight">Lifecycle Schedule</h4>
+              <p className="text-xs text-slate-400 font-medium">Operations & transitions timeline</p>
+            </div>
+          </div>
+          <button 
+            type="button" 
+            onClick={onClose} 
+            className="flex h-8 w-8 items-center justify-center rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition cursor-pointer"
+          >
+            <X size={16} />
+          </button>
+        </div>
+
+        {/* Layout Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-stretch">
+          {/* Calendar Picker Column (7/12) */}
+          <div className="md:col-span-7 flex flex-col justify-between">
+            <div>
+              {/* Calendar Month Header */}
+              <div className="flex items-center justify-between px-1 mb-4">
+                <span className="text-sm font-bold text-slate-800 font-sans">August 2026</span>
+                <div className="flex gap-1">
+                  <button type="button" className="p-1 rounded-md hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition cursor-pointer">
+                    <ChevronLeft size={16} />
+                  </button>
+                  <button type="button" className="p-1 rounded-md hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition cursor-pointer">
+                    <ChevronRight size={16} />
+                  </button>
+                </div>
+              </div>
+
+              {/* Day names */}
+              <div className="grid grid-cols-7 gap-1.5 text-center text-[10px] font-bold text-slate-400 tracking-wider uppercase mb-2">
+                {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map(d => <span key={d}>{d}</span>)}
+              </div>
+
+              {/* Calendar Grid */}
+              <div className="grid grid-cols-7 gap-1.5">
+                {/* Offset days (Aug 1, 2026 starts on Saturday, so 6 empty slots) */}
+                {Array.from({ length: 6 }).map((_, i) => <span key={`empty-${i}`} />)}
+                
+                {daysInMonth.map(day => {
+                  const dayEvent = events.find(e => e.day === day)
+                  const isSelected = selectedDay === day
+                  
+                  // Style configurations based on event type
+                  let buttonClass = 'hover:bg-slate-100 text-slate-700'
+                  let indicatorColor = ''
+                  
+                  if (dayEvent) {
+                    if (dayEvent.type === 'onboarding') {
+                      buttonClass = 'bg-[#edf3ef] text-[#426759] border border-[#b9d0c1]/40'
+                      indicatorColor = 'bg-[#426759]'
+                    } else {
+                      buttonClass = 'bg-rose-50 text-rose-700 border border-rose-100'
+                      indicatorColor = 'bg-rose-500'
+                    }
+                  }
+                  
+                  if (isSelected) {
+                    buttonClass = 'bg-gradient-to-br from-[#426759] to-[#315447] text-white shadow-[0_4px_12px_rgba(66,103,89,0.3)]'
+                  }
+
+                  return (
+                    <button
+                      key={day}
+                      onClick={() => setSelectedDay(day)}
+                      className={`h-9 w-9 rounded-xl text-[11px] font-bold transition-all relative flex items-center justify-center cursor-pointer ${buttonClass}`}
+                    >
+                      {day}
+                      {dayEvent && (
+                        <span className={`absolute bottom-1 h-1 w-1 rounded-full ${isSelected ? 'bg-white' : indicatorColor}`} />
+                      )}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          </div>
+
+          {/* Events Detail Panel Column (5/12) */}
+          <div className="md:col-span-5 flex flex-col justify-between border-t md:border-t-0 md:border-l border-slate-100 pt-4 md:pt-0 md:pl-5 min-h-[220px]">
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Timeline events</span>
+                <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">Aug {selectedDay}</span>
+              </div>
+
+              {activeEvents.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-6 text-center text-slate-400 space-y-2">
+                  <div className="h-10 w-10 flex items-center justify-center rounded-full bg-slate-50 text-slate-300">
+                    <Clock3 size={18} />
+                  </div>
+                  <p className="text-xs italic font-medium">No lifecycle events scheduled.</p>
+                </div>
+              ) : (
+                <div className="space-y-2.5">
+                  {activeEvents.map((evt, i) => {
+                    const isJoin = evt.type === 'onboarding'
+                    return (
+                      <div 
+                        key={i} 
+                        className={`group p-3 rounded-xl border transition-all hover:shadow-[0_4px_12px_rgba(15,23,42,0.04)] text-left ${
+                          isJoin ? 'bg-[#edf3ef]/30 border-[#b9d0c1]/40' : 'bg-rose-50/20 border-rose-100/50'
+                        }`}
+                      >
+                        <div className="flex items-start gap-2.5">
+                          <div className={`mt-0.5 flex h-7 w-7 items-center justify-center rounded-lg ${
+                            isJoin ? 'bg-[#edf3ef] text-[#426759]' : 'bg-rose-50 text-rose-500'
+                          }`}>
+                            {isJoin ? <UserPlus size={14} /> : <Archive size={14} />}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <h5 className="text-[12px] font-bold text-slate-700 leading-tight group-hover:text-[#426759] transition-colors">{evt.title}</h5>
+                            <p className="text-[10px] text-slate-400 font-medium mt-0.5 leading-none">{evt.subtitle}</p>
+                            <div className="flex items-center gap-1 mt-2 text-[9px] font-bold text-slate-400">
+                              <Clock3 size={10} />
+                              <span>{evt.time}</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+
+            <button 
+              onClick={onClose} 
+              className="mt-4 w-full py-2.5 bg-gradient-to-r from-[#426759] to-[#517a6c] hover:from-[#315447] hover:to-[#426759] text-white text-xs font-bold rounded-xl transition shadow-md shadow-[#426759]/10 cursor-pointer"
+            >
+              Close Calendar
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }

@@ -88,6 +88,14 @@ export default function TemplateManagement({ currentUser, employeeRecordsState, 
     localStorage.setItem('empflow-document-templates', JSON.stringify(templates))
   }, [templates])
 
+  useEffect(() => {
+    const shouldOpen = localStorage.getItem('empflow-auto-create-template')
+    if (shouldOpen === 'true') {
+      setActiveView('create')
+      localStorage.removeItem('empflow-auto-create-template')
+    }
+  }, [])
+
   const [activeView, setActiveView] = useState('list') // 'list', 'edit', 'create'
   const [editingTemplate, setEditingTemplate] = useState(null)
   const [searchQuery, setSearchQuery] = useState('')

@@ -33,7 +33,7 @@ function Step({ number, label, active, done }) {
   </div>
 }
 
-export default function Onboarding({ onAction }) {
+export default function Onboarding({ onAction, defaultSelected, setDefaultSelected }) {
   const [employees, setEmployees] = useState(() => {
     try {
       const savedEmployees = JSON.parse(localStorage.getItem('empflow-onboarding-employees'))
@@ -45,7 +45,16 @@ export default function Onboarding({ onAction }) {
       return normalizeEmployees(initialEmployees)
     } catch { return initialEmployees }
   })
-  const [selected, setSelected] = useState('Sara Khan')
+  const [selected, setSelected] = useState(() => {
+    return defaultSelected || 'Sara Khan'
+  })
+
+  useEffect(() => {
+    if (defaultSelected) {
+      setSelected(defaultSelected)
+      if (setDefaultSelected) setDefaultSelected(null)
+    }
+  }, [defaultSelected])
   const [checked, setChecked] = useState(() => {
     try { return JSON.parse(localStorage.getItem('empflow-document-checks')) || documents.map((item) => item.complete) } catch { return documents.map((item) => item.complete) }
   })
@@ -61,6 +70,14 @@ export default function Onboarding({ onAction }) {
   useEffect(() => localStorage.setItem('empflow-onboarding-employees', JSON.stringify(employees)), [employees])
   useEffect(() => localStorage.setItem('empflow-document-checks', JSON.stringify(checked)), [checked])
   useEffect(() => localStorage.setItem('empflow-approval-requested', JSON.stringify(approvalRequested)), [approvalRequested])
+
+  useEffect(() => {
+    const shouldOpen = localStorage.getItem('empflow-auto-initiate-onboarding')
+    if (shouldOpen === 'true') {
+      setModal({ type: 'initiate' })
+      localStorage.removeItem('empflow-auto-initiate-onboarding')
+    }
+  }, [])
 
   const toggleDocument = (index) => {
     setChecked((items) => items.map((value, itemIndex) => itemIndex === index ? !value : value))
