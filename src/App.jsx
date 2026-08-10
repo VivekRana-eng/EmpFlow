@@ -36,6 +36,7 @@ import { initialOffboardingProcesses } from './models/offboardingModel'
 import { initialGeneratedDocuments } from './models/documentModel'
 import { initialChecklistItems } from './models/checklistModel'
 import { initialApprovals } from './models/approvalModel'
+import { initialAuditLogs } from './models/auditModel'
 import Onboarding from './pages/Onboarding'
 
 import LoginPage from './components/Login/LoginPage'
@@ -87,6 +88,23 @@ function StatusBadge({ status }) {
   return <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ring-1 ring-inset ${styles[status]}`}>{status}</span>
 }
 
+const getRelativeTime = (timestamp) => {
+  const diff = Date.now() - new Date(timestamp).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return 'Just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
+};
+
+const isUnreadForRole = (notification, role) => {
+  if (!role || !notification || !Array.isArray(notification.readBy)) return true;
+  const roleUpper = role.toUpperCase();
+  return !notification.readBy.some(r => r && r.role === roleUpper);
+};
+
 function App() {
   const [currentUser, setCurrentUser] = useState(() => {
     try {
@@ -107,6 +125,9 @@ function App() {
   const [showNotifications, setShowNotifications] = useState(false)
   const [showHelp, setShowHelp] = useState(false)
   const [hasUnread, setHasUnread] = useState(true)
+  
+  const [selectedEmployee, setSelectedEmployee] = useState(null)
+  const [autoOpenDocName, setAutoOpenDocName] = useState(null)
 
   // Centralized system states
   const [departments, setDepartments] = useState(() => {
@@ -155,6 +176,75 @@ function App() {
     ]
   })
 
+  const [notifications, setNotifications] = useState(() => {
+    try {
+      const saved = localStorage.getItem('empflow-notifications')
+      if (saved) {
+        const parsed = JSON.parse(saved)
+        if (Array.isArray(parsed) && parsed.every(n => n && Array.isArray(n.targetRoles))) {
+          return parsed
+        }
+      }
+    } catch {}
+    return [
+      {
+        id: "init_1",
+        type: "DOCUMENT_UPLOADED",
+        employeeId: "EMP-1002",
+        employeeName: "Rahul Sharma",
+        documentName: "Degree.pdf",
+        documentType: "Academic",
+        uploadedAt: new Date(Date.now() - 60 * 1000).toISOString(),
+        status: "Pending Review",
+        targetRoles: ["ADMIN", "HR"],
+        readBy: [],
+        actionRequired: true
+      },
+      {
+        id: "init_2",
+        type: "DOCUMENT_UPLOADED",
+        employeeId: "EMP-1005",
+        employeeName: "Priya Verma",
+        documentName: "Identity Proof",
+        documentType: "KYC",
+        uploadedAt: new Date(Date.now() - 5 * 60 * 1000).toISOString(),
+        status: "Pending Review",
+        targetRoles: ["ADMIN", "HR"],
+        readBy: [],
+        actionRequired: true
+      },
+      {
+        id: "init_3",
+        type: "DOCUMENT_UPLOADED",
+        employeeId: "EMP-1003",
+        employeeName: "Manoj Kumar",
+        documentName: "Exit Document",
+        documentType: "Compliance",
+        uploadedAt: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+        status: "Approved",
+        targetRoles: ["ADMIN", "HR"],
+        readBy: [
+          { role: "ADMIN", readAt: new Date(Date.now() - 23 * 60 * 60 * 1000).toISOString() },
+          { role: "HR", readAt: new Date(Date.now() - 23 * 60 * 60 * 1000).toISOString() }
+        ],
+        actionRequired: false
+      }
+    ]
+  })
+
+  const [auditLogs, setAuditLogs] = useState(() => {
+    try {
+      const saved = localStorage.getItem('empflow-audit-logs')
+      if (saved) return JSON.parse(saved)
+    } catch {}
+    return [
+      { id: 'l1', action: 'System setup completed successfully.', timestamp: '10 Aug 2026, 07:00', user: 'System' },
+      { id: 'l2', action: 'Preloaded company records with 5 core departments, 8 primary designations, and 9 employees.', timestamp: '10 Aug 2026, 07:05', user: 'Admin' },
+      { id: 'l3', action: 'Active directory directory accounts verified for Super Admin.', timestamp: '10 Aug 2026, 07:10', user: 'System' },
+      { id: 'l4', action: 'Uploaded corporate document templates v2.4 (Offer Letter, Relieving Certificate, NOC).', timestamp: '10 Aug 2026, 07:12', user: 'Aditi Deshmukh' }
+    ]
+  })
+
   useEffect(() => {
     localStorage.setItem('empflow-depts', JSON.stringify(departments))
   }, [departments])
@@ -170,6 +260,38 @@ function App() {
   useEffect(() => {
     localStorage.setItem('empflow-offboardings', JSON.stringify(offboardings))
   }, [offboardings])
+
+  useEffect(() => {
+    localStorage.setItem('empflow-notifications', JSON.stringify(notifications))
+  }, [notifications])
+
+  useEffect(() => {
+    localStorage.setItem('empflow-audit-logs', JSON.stringify(auditLogs))
+  }, [auditLogs])
+
+  // Cross-tab synchronization via storage events
+  useEffect(() => {
+    const handleStorageChange = (e) => {
+      try {
+        if (e.key === 'empflow-notifications') {
+          const parsed = JSON.parse(e.newValue)
+          if (parsed && JSON.stringify(parsed) !== JSON.stringify(notifications)) {
+            setNotifications(parsed)
+          }
+        }
+        if (e.key === 'empflow-audit-logs') {
+          const parsed = JSON.parse(e.newValue)
+          if (parsed && JSON.stringify(parsed) !== JSON.stringify(auditLogs)) {
+            setAuditLogs(parsed)
+          }
+        }
+      } catch (err) {
+        console.error(err)
+      }
+    }
+    window.addEventListener('storage', handleStorageChange)
+    return () => window.removeEventListener('storage', handleStorageChange)
+  }, [notifications, auditLogs])
 
   useEffect(() => {
     if (!currentUser) return
@@ -206,12 +328,26 @@ function App() {
             setEmployeeRecordsState(normalizedEmployees)
           }
         }
+        const savedNotifs = localStorage.getItem('empflow-notifications')
+        if (savedNotifs) {
+          const parsed = JSON.parse(savedNotifs)
+          if (JSON.stringify(parsed) !== JSON.stringify(notifications)) {
+            setNotifications(parsed)
+          }
+        }
+        const savedAudit = localStorage.getItem('empflow-audit-logs')
+        if (savedAudit) {
+          const parsed = JSON.parse(savedAudit)
+          if (JSON.stringify(parsed) !== JSON.stringify(auditLogs)) {
+            setAuditLogs(parsed)
+          }
+        }
       } catch (e) {
         console.error(e)
       }
     }, 1000)
     return () => clearInterval(interval)
-  }, [currentUser, offboardings, departments, designations, employeeRecordsState])
+  }, [currentUser, offboardings, departments, designations, employeeRecordsState, notifications, auditLogs])
 
   const handleUpdateEmployee = (updatedEmp, newDesigTitle) => {
     if (newDesigTitle) {
@@ -231,17 +367,21 @@ function App() {
   }
 
   const handleLogin = (user) => {
-    setCurrentUser(user)
     localStorage.setItem('empflow-session', JSON.stringify(user))
+    setCurrentUser(user)
     setActivePage('Dashboard')
+    setSelectedEmployee(null)
+    setAutoOpenDocName(null)
     showToast(`Logged in as ${user.name}`)
   }
 
   const handleLogout = () => {
-    setCurrentUser(null)
     localStorage.removeItem('empflow-session')
-    setShowProfileMenu(false)
+    setCurrentUser(null)
     setActivePage('Dashboard')
+    setSelectedEmployee(null)
+    setAutoOpenDocName(null)
+    setShowProfileMenu(false)
   }
 
   const currentTime = new Date()
@@ -306,6 +446,48 @@ function App() {
     ['Exited', initialOffboardingProcesses.filter((process) => process.status === 'Completed').length, 'bg-slate-100', 'text-slate-600'],
   ]
 
+  const userNotifications = useMemo(() => {
+    if (!currentUser) return []
+    const roleUpper = currentUser.role.toUpperCase()
+    const filtered = notifications.filter(n => {
+      if (!n || !Array.isArray(n.targetRoles)) return false;
+      if (roleUpper === 'EMPLOYEE') {
+        return n.targetRoles.includes('EMPLOYEE') && n.employeeId === currentUser.employeeId;
+      }
+      return n.targetRoles.includes(roleUpper);
+    })
+
+    return filtered.map(n => {
+      let title = n.title;
+      let message = n.message;
+      let status = n.status || 'Pending Review';
+
+      if (n.type === 'DOCUMENT_UPLOADED') {
+        title = 'New document uploaded';
+        message = `${n.employeeName} uploaded ${n.documentName}.`;
+      } else if (n.type === 'DOCUMENT_APPROVED') {
+        title = 'Document Approved';
+        message = n.message || `${n.documentName} submitted by ${n.employeeName} was approved.`;
+      } else if (n.type === 'DOCUMENT_REJECTED') {
+        title = 'Document Rejected';
+        message = n.message || `${n.documentName} submitted by ${n.employeeName} was rejected.`;
+      }
+
+      return {
+        ...n,
+        title,
+        message,
+        time: getRelativeTime(n.uploadedAt),
+        unread: isUnreadForRole(n, currentUser.role),
+        statusText: status
+      }
+    })
+  }, [notifications, currentUser])
+
+  const unreadCount = useMemo(() => {
+    return userNotifications.filter(n => n.unread).length;
+  }, [userNotifications])
+
   if (!currentUser) {
     return <LoginPage onLogin={handleLogin} />
   }
@@ -319,27 +501,53 @@ function App() {
 
   const filteredNavItems = navItems.filter((item) => allowedPages.includes(item.label))
 
-  const notificationsByRole = {
-    Admin: [
-      { id: 1, title: 'System Security Scan', message: 'All systems operational. Last check: 10 mins ago.', time: '10m ago', unread: true },
-      { id: 2, title: 'Settings Updated', message: 'Vikram Rana updated workflows for Exit Approvals.', time: '1h ago', unread: false },
-      { id: 3, title: 'New User Registered', message: 'Manager Rohan Mehta joined the portal.', time: '2d ago', unread: false }
-    ],
-    HR: [
-      { id: 1, title: 'Resignation Request Submitted', message: 'Rahul Sharma submitted a resignation request.', time: '2m ago', unread: true },
-      { id: 2, title: 'Onboarding Process', message: '12 new candidates scheduled to start next week.', time: '2h ago', unread: true },
-      { id: 3, title: 'Exit Relieving Pending', message: 'Manoj Kumar clearance is awaiting final sign-off.', time: '1d ago', unread: false }
-    ],
-    Manager: [
-      { id: 1, title: 'Action Required: Exit Approval', message: 'Please review and approve Rahul Sharma\'s exit request.', time: '2m ago', unread: true },
-      { id: 2, title: 'Team Directory Update', message: 'New employee assigned to Software Engineering team.', time: '1d ago', unread: false }
-    ],
-    Employee: [
-      { id: 1, title: 'Document Signed', message: 'Your Offer Letter has been verified and stored.', time: '3h ago', unread: true },
-      { id: 2, title: 'Exit Clearance Status', message: 'Your exit process status is currently Awaiting Approval.', time: '1d ago', unread: false },
-      { id: 3, title: 'Policy Update', message: 'Annual performance review guidelines are now available.', time: '5d ago', unread: false }
-    ]
-  }[currentUser?.role] || []
+  const handleNotificationClick = (notification) => {
+    const roleUpper = currentUser.role.toUpperCase()
+    if (!notification.readBy.some(r => r.role === roleUpper)) {
+      const updatedNotifications = notifications.map(n => {
+        if (n.id === notification.id) {
+          return {
+            ...n,
+            readBy: [...n.readBy, { role: roleUpper, readAt: new Date().toISOString() }]
+          }
+        }
+        return n;
+      });
+      setNotifications(updatedNotifications);
+      localStorage.setItem('empflow-notifications', JSON.stringify(updatedNotifications));
+      window.dispatchEvent(new Event('storage'));
+    }
+
+    if (notification.employeeId) {
+      const emp = employeeRecordsState.find(e => 
+        e.employeeId === notification.employeeId || 
+        ('EMP-' + e.id.slice(1).padStart(3, '0')) === notification.employeeId
+      );
+      if (emp) {
+        setActivePage('Employees');
+        setSelectedEmployee(emp);
+        setAutoOpenDocName(notification.documentName);
+      }
+    }
+    setShowNotifications(false);
+  }
+
+  const handleMarkAllRead = () => {
+    const roleUpper = currentUser.role.toUpperCase()
+    const updatedNotifications = notifications.map(n => {
+      if (n.targetRoles.includes(roleUpper) && !n.readBy.some(r => r.role === roleUpper)) {
+        return {
+          ...n,
+          readBy: [...n.readBy, { role: roleUpper, readAt: new Date().toISOString() }]
+        }
+      }
+      return n;
+    });
+    setNotifications(updatedNotifications);
+    localStorage.setItem('empflow-notifications', JSON.stringify(updatedNotifications));
+    window.dispatchEvent(new Event('storage'));
+    showToast('Marked all as read');
+  }
 
   return (
     <div className="min-h-screen bg-[#e9e8e1] p-3 text-slate-900 sm:p-6 lg:p-8">
@@ -400,34 +608,51 @@ function App() {
             </div>
             <div className="relative">
               <button 
-                onClick={() => { setShowNotifications(!showNotifications); setShowHelp(false); setShowProfileMenu(false); setHasUnread(false) }}
+                onClick={() => { setShowNotifications(!showNotifications); setShowHelp(false); setShowProfileMenu(false); }}
                 className="relative rounded-lg p-2 text-slate-500 hover:bg-slate-50 cursor-pointer"
               >
                 <Bell size={18} />
-                {hasUnread && <span className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-rose-500 ring-2 ring-white" />}
+                {unreadCount > 0 && (
+                  <span className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-rose-500 text-[9px] font-bold text-white ring-1 ring-white">
+                    {unreadCount}
+                  </span>
+                )}
               </button>
               {showNotifications && (
                 <div className="absolute right-0 top-11 z-50 w-80 rounded-xl border border-slate-200 bg-white p-2 shadow-xl">
                   <div className="flex items-center justify-between border-b border-slate-100 px-3 py-2">
                     <span className="text-xs font-bold text-slate-800">Notifications</span>
                     <button 
-                      onClick={() => { setHasUnread(false); showToast('Marked all as read') }} 
-                      className="text-[10px] font-semibold text-indigo-600 hover:text-indigo-800"
+                      onClick={handleMarkAllRead} 
+                      className="text-[10px] font-semibold text-indigo-600 hover:text-indigo-800 animate-fade-in"
                     >
                       Mark all read
                     </button>
                   </div>
                   <div className="max-h-64 overflow-y-auto py-1 divide-y divide-slate-50">
-                    {notificationsByRole.length === 0 ? (
+                    {userNotifications.length === 0 ? (
                       <div className="px-3 py-6 text-center text-xs text-slate-400">No new notifications</div>
                     ) : (
-                      notificationsByRole.map((n) => (
-                        <div key={n.id} className={`p-3 text-left transition hover:bg-slate-50 ${n.unread && hasUnread ? 'bg-indigo-50/30' : ''}`}>
+                      userNotifications.map((n) => (
+                        <div 
+                          key={n.id} 
+                          onClick={() => handleNotificationClick(n)}
+                          className={`p-3 text-left transition hover:bg-slate-50 cursor-pointer ${n.unread ? 'bg-indigo-50/40' : ''}`}
+                        >
                           <div className="flex items-center justify-between">
-                            <span className="text-[11px] font-bold text-slate-800">{n.title}</span>
+                            <span className={`text-[11px] text-slate-800 ${n.unread ? 'font-bold' : 'font-medium'}`}>
+                              {n.unread && <span className="mr-1 inline-block h-1.5 w-1.5 rounded-full bg-indigo-600 animate-pulse" />}
+                              {n.title}
+                            </span>
                             <span className="text-[9px] text-slate-400">{n.time}</span>
                           </div>
-                          <p className="mt-0.5 text-[10px] text-slate-500 leading-normal">{n.message}</p>
+                          <p className="mt-0.5 text-[10px] text-slate-500 leading-normal font-normal">{n.message}</p>
+                          <div className="mt-1 flex items-center justify-between">
+                            <span className="text-[9px] text-slate-400 capitalize">{n.documentType || 'General'} · Status: <span className={n.statusText === 'Approved' ? 'text-emerald-600 font-semibold' : n.statusText === 'Rejected' ? 'text-rose-500 font-semibold' : 'text-amber-600 font-semibold'}>{n.statusText}</span></span>
+                            {n.actionRequired && n.unread && (
+                              <span className="rounded bg-rose-50 px-1 py-0.5 text-[8px] font-bold text-rose-600 ring-1 ring-inset ring-rose-500/10">Action Required</span>
+                            )}
+                          </div>
                         </div>
                       ))
                     )}
@@ -496,7 +721,7 @@ function App() {
             <EmployeeDashboard currentUser={currentUser} onAction={showToast} />
           ) : currentUser.role === 'Manager' ? (
             activePage === 'Employees' ? (
-              <EmployeeDirectory search={search} onAction={showToast} currentUser={currentUser} employeeRecordsState={employeeRecordsState} departments={departments} designations={designations} onUpdateEmployee={handleUpdateEmployee} />
+              <EmployeeDirectory search={search} onAction={showToast} currentUser={currentUser} employeeRecordsState={employeeRecordsState} departments={departments} designations={designations} onUpdateEmployee={handleUpdateEmployee} selectedEmployee={selectedEmployee} setSelectedEmployee={setSelectedEmployee} autoOpenDocName={autoOpenDocName} setAutoOpenDocName={setAutoOpenDocName} />
             ) : activePage === 'Reports' ? (
               <ModulePlaceholder page={activePage} onAction={showToast} />
             ) : activePage === 'Offboarding' ? (
@@ -505,7 +730,7 @@ function App() {
               <ManagerDashboard onAction={showToast} />
             )
           ) : activePage === 'Employees' ? (
-            <EmployeeDirectory search={search} onAction={showToast} currentUser={currentUser} employeeRecordsState={employeeRecordsState} departments={departments} designations={designations} onUpdateEmployee={handleUpdateEmployee} />
+            <EmployeeDirectory search={search} onAction={showToast} currentUser={currentUser} employeeRecordsState={employeeRecordsState} departments={departments} designations={designations} onUpdateEmployee={handleUpdateEmployee} selectedEmployee={selectedEmployee} setSelectedEmployee={setSelectedEmployee} autoOpenDocName={autoOpenDocName} setAutoOpenDocName={setAutoOpenDocName} />
           ) : activePage === 'Onboarding' ? (
             <Onboarding onAction={showToast} />
           ) : activePage === 'Offboarding' ? (
@@ -594,11 +819,10 @@ function ModulePlaceholder({ page, onAction }) {
   return <div className="flex min-h-[620px] items-center justify-center"><div className="max-w-md text-center"><div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-600"><Icon size={28} /></div><h2 className="text-2xl font-bold tracking-tight text-slate-900">{content[0]}</h2><p className="mt-2 text-sm leading-6 text-slate-500">{content[1]}</p><button onClick={() => onAction(`${page} module opened`)} className="mt-6 inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 text-xs font-semibold text-white shadow-sm shadow-indigo-200 hover:bg-indigo-700"><Plus size={16} />Create new</button></div></div>
 }
 
-function EmployeeDirectory({ search, onAction, currentUser, employeeRecordsState, departments, designations, onUpdateEmployee }) {
+function EmployeeDirectory({ search, onAction, currentUser, employeeRecordsState, departments, designations, onUpdateEmployee, selectedEmployee, setSelectedEmployee, autoOpenDocName, setAutoOpenDocName }) {
   const [department, setDepartment] = useState('All departments')
   const [status, setStatus] = useState('All statuses')
   const [page, setPage] = useState(1)
-  const [selectedEmployee, setSelectedEmployee] = useState(null)
 
   useEffect(() => setPage(1), [search])
 
@@ -624,11 +848,11 @@ function EmployeeDirectory({ search, onAction, currentUser, employeeRecordsState
       <div className="overflow-x-auto"><table className="w-full min-w-[820px] text-left"><thead className="border-y border-slate-100 bg-slate-50/70 text-[10px] font-semibold uppercase tracking-wider text-slate-400"><tr><th className="px-4 py-3">Employee</th><th className="px-4 py-3">Department</th><th className="px-4 py-3">Designation</th><th className="px-4 py-3">Employee ID</th><th className="px-4 py-3">Status</th><th className="px-4 py-3">Actions</th></tr></thead><tbody className="divide-y divide-slate-100">{visibleRows.map((employee) => { const dept = initialDepartments.find((item) => item.id === employee.department_id)?.name || '—'; const title = initialDesignations.find((item) => item.id === employee.designation_id)?.title || '—'; return <tr key={employee.id} onClick={() => setSelectedEmployee(employee)} className="cursor-pointer transition hover:bg-slate-50/70"><td className="px-4 py-3.5"><div className="flex items-center gap-3"><div className="flex h-9 w-9 items-center justify-center rounded-full bg-indigo-50 text-[10px] font-bold text-indigo-700">{employee.name.split(' ').map((name) => name[0]).join('')}</div><div><p className="text-xs font-semibold text-slate-700">{employee.name}</p><p className="mt-0.5 text-[10px] text-slate-400">{employee.email}</p></div></div></td><td className="px-4 py-3.5 text-xs text-slate-500">{dept}</td><td className="px-4 py-3.5 text-xs text-slate-500">{title}</td><td className="px-4 py-3.5 text-xs font-medium text-slate-500">EMP-{employee.id.slice(1).padStart(3, '0')}</td><td className="px-4 py-3.5"><EmployeeStatusBadge status={employee.status} /></td><td className="px-4 py-3.5"><button onClick={(event) => { event.stopPropagation(); setSelectedEmployee(employee) }} className="rounded-md p-1.5 text-slate-400 hover:bg-slate-100 hover:text-indigo-600"><MoreHorizontal size={16} /></button></td></tr> })}</tbody></table>{rows.length === 0 && <div className="py-14 text-center text-sm text-slate-400">No employees match the selected filters.</div>}</div>
       <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-4"><p className="text-[11px] text-slate-400">Showing {rows.length === 0 ? 0 : (page - 1) * pageSize + 1}-{Math.min(page * pageSize, rows.length)} of {rows.length} employees</p><div className="flex items-center gap-1"><button disabled={page === 1} onClick={() => setPage(Math.max(1, page - 1))} className="rounded-md border border-slate-200 px-2.5 py-1.5 text-[11px] text-slate-500 disabled:cursor-not-allowed disabled:opacity-40">Previous</button><span className="rounded-md bg-indigo-50 px-2.5 py-1.5 text-[11px] font-semibold text-indigo-700">{page} / {totalPages}</span><button disabled={page === totalPages} onClick={() => setPage(Math.min(totalPages, page + 1))} className="rounded-md border border-slate-200 px-2.5 py-1.5 text-[11px] text-slate-500 disabled:cursor-not-allowed disabled:opacity-40">Next</button></div></div>
     </div>
-    {selectedEmployee && <EmployeeProfileCard employee={selectedEmployee} onClose={() => setSelectedEmployee(null)} onAction={onAction} currentUser={currentUser} onUpdateEmployee={onUpdateEmployee} departments={departments} designations={designations} />}
+    {selectedEmployee && <EmployeeProfileCard employee={selectedEmployee} onClose={() => { setSelectedEmployee(null); setAutoOpenDocName && setAutoOpenDocName(null); }} onAction={onAction} currentUser={currentUser} onUpdateEmployee={onUpdateEmployee} departments={departments} designations={designations} autoOpenDocName={autoOpenDocName} setAutoOpenDocName={setAutoOpenDocName} />}
   </div>
 }
 
-function EmployeeProfileCard({ employee, onClose, onAction, currentUser, onUpdateEmployee, departments, designations }) {
+function EmployeeProfileCard({ employee, onClose, onAction, currentUser, onUpdateEmployee, departments, designations, autoOpenDocName, setAutoOpenDocName }) {
   const department = departments.find((item) => item.id === employee.department_id)?.name || '—'
   const designation = designations.find((item) => item.id === employee.designation_id)?.title || '—'
   const [menuOpen, setMenuOpen] = useState(false)
@@ -646,6 +870,35 @@ function EmployeeProfileCard({ employee, onClose, onAction, currentUser, onUpdat
   const [editPhone, setEditPhone] = useState(employee.phone || '')
   const [editDesignation, setEditDesignation] = useState(designation)
   const [profileViewerDoc, setProfileViewerDoc] = useState(null)
+
+  const [showAuditLogs, setShowAuditLogs] = useState(false)
+  const [showRejectionInput, setShowRejectionInput] = useState(false)
+  const [rejectionReason, setRejectionReason] = useState('')
+
+  const employeeDocs = (() => {
+    if (employee.name === 'Rahul Sharma') {
+      try {
+        const saved = localStorage.getItem('empflow-employee-documents')
+        if (saved) return JSON.parse(saved)
+      } catch {}
+    }
+    return [
+      { name: 'Offer Letter', type: 'Employment', status: 'Verified & Signed', date: '15 Jul 2026', file: 'offer_letter.pdf' },
+      { name: 'Identity Proof (Aadhaar/PAN)', type: 'KYC', status: 'Verified', date: '16 Jul 2026', file: 'kyc.pdf' },
+      { name: 'Bank Account & PAN details', type: 'Finance', status: 'Verified', date: '16 Jul 2026', file: 'bank_details.pdf' },
+      { name: 'Non-Disclosure Agreement', type: 'Compliance', status: 'Pending Signature', date: 'Pending', file: 'nda.pdf' }
+    ]
+  })()
+
+  useEffect(() => {
+    if (autoOpenDocName) {
+      setDocumentsOpen(true)
+      const doc = employeeDocs.find(d => d.name === autoOpenDocName)
+      if (doc) {
+        setProfileViewerDoc(doc)
+      }
+    }
+  }, [autoOpenDocName])
 
   const handleSave = () => {
     let desigId = employee.designation_id;
@@ -675,29 +928,219 @@ function EmployeeProfileCard({ employee, onClose, onAction, currentUser, onUpdat
     setEditOpen(false);
   }
 
-  const employeeDocs = (() => {
+  const formatDate = (date) => {
+    const day = String(date.getDate()).padStart(2, '0');
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const month = months[date.getMonth()];
+    const year = date.getFullYear();
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    return `${day} ${month} ${year}, ${hours}:${minutes}`;
+  }
+
+  const handleApprove = () => {
+    const updatedDocs = employeeDocs.map(d => {
+      if (d.name === profileViewerDoc.name) {
+        return { ...d, status: 'Approved', verifiedBy: currentUser.role }
+      }
+      return d
+    });
+    
     if (employee.name === 'Rahul Sharma') {
-      try {
-        const saved = localStorage.getItem('empflow-employee-documents')
-        if (saved) return JSON.parse(saved)
-      } catch {}
+      localStorage.setItem('empflow-employee-documents', JSON.stringify(updatedDocs));
     }
-    return [
-      { name: 'Offer Letter', type: 'Employment', status: 'Verified & Signed', date: '15 Jul 2026', file: 'offer_letter.pdf' },
-      { name: 'Identity Proof (Aadhaar/PAN)', type: 'KYC', status: 'Verified', date: '16 Jul 2026', file: 'kyc.pdf' },
-      { name: 'Bank Account & PAN details', type: 'Finance', status: 'Verified', date: '16 Jul 2026', file: 'bank_details.pdf' },
-      { name: 'Non-Disclosure Agreement', type: 'Compliance', status: 'Pending Signature', date: 'Pending', file: 'nda.pdf' }
-    ]
-  })()
+    
+    const auditId = 'l_' + Date.now();
+    const newAudit = {
+      id: auditId,
+      action: `${currentUser.role} approved ${profileViewerDoc.name} for ${employee.name}`,
+      timestamp: formatDate(new Date()),
+      user: currentUser.name,
+      employeeId: employee.employeeId || 'EMP-1002'
+    }
+    
+    try {
+      const savedAudits = localStorage.getItem('empflow-audit-logs')
+      const audits = savedAudits ? JSON.parse(savedAudits) : []
+      audits.unshift(newAudit)
+      localStorage.setItem('empflow-audit-logs', JSON.stringify(audits))
+    } catch (e) { console.error(e) }
+
+    const notifId1 = 'notif_' + Date.now() + '_1';
+    const notifId2 = 'notif_' + Date.now() + '_2';
+    
+    const employeeNotif = {
+      id: notifId1,
+      type: "DOCUMENT_APPROVED",
+      employeeId: employee.employeeId || 'EMP-1002',
+      employeeName: employee.name,
+      documentName: profileViewerDoc.name,
+      documentType: profileViewerDoc.type,
+      uploadedAt: new Date().toISOString(),
+      status: "Approved",
+      targetRoles: ["EMPLOYEE"],
+      message: `Your ${profileViewerDoc.name} has been approved by ${currentUser.role}.`,
+      readBy: [],
+      actionRequired: false
+    }
+
+    const peerRole = currentUser.role === 'Admin' ? 'HR' : 'ADMIN';
+    const peerNotif = {
+      id: notifId2,
+      type: "DOCUMENT_APPROVED",
+      employeeId: employee.employeeId || 'EMP-1002',
+      employeeName: employee.name,
+      documentName: profileViewerDoc.name,
+      documentType: profileViewerDoc.type,
+      uploadedAt: new Date().toISOString(),
+      status: "Approved",
+      targetRoles: [peerRole],
+      message: `${profileViewerDoc.name} submitted by ${employee.name} was approved by ${currentUser.role}.`,
+      readBy: [],
+      actionRequired: false
+    }
+
+    try {
+      const savedNotifs = localStorage.getItem('empflow-notifications')
+      const notifications = savedNotifs ? JSON.parse(savedNotifs) : []
+      notifications.unshift(employeeNotif, peerNotif)
+      localStorage.setItem('empflow-notifications', JSON.stringify(notifications))
+    } catch (e) { console.error(e) }
+
+    window.dispatchEvent(new Event('storage'));
+    
+    setProfileViewerDoc({ ...profileViewerDoc, status: 'Approved' });
+    onAction?.(`${profileViewerDoc.name} approved successfully`);
+  }
+
+  const handleConfirmReject = () => {
+    if (!rejectionReason.trim()) return;
+    
+    const updatedDocs = employeeDocs.map(d => {
+      if (d.name === profileViewerDoc.name) {
+        return { ...d, status: 'Rejected', rejectionReason: rejectionReason.trim(), verifiedBy: currentUser.role }
+      }
+      return d
+    });
+    
+    if (employee.name === 'Rahul Sharma') {
+      localStorage.setItem('empflow-employee-documents', JSON.stringify(updatedDocs));
+    }
+    
+    const auditId = 'l_' + Date.now();
+    const newAudit = {
+      id: auditId,
+      action: `${currentUser.role} rejected ${profileViewerDoc.name} for ${employee.name}. Reason: ${rejectionReason.trim()}`,
+      timestamp: formatDate(new Date()),
+      user: currentUser.name,
+      employeeId: employee.employeeId || 'EMP-1002'
+    }
+    
+    try {
+      const savedAudits = localStorage.getItem('empflow-audit-logs')
+      const audits = savedAudits ? JSON.parse(savedAudits) : []
+      audits.unshift(newAudit)
+      localStorage.setItem('empflow-audit-logs', JSON.stringify(audits))
+    } catch (e) { console.error(e) }
+
+    const notifId1 = 'notif_' + Date.now() + '_1';
+    const notifId2 = 'notif_' + Date.now() + '_2';
+    
+    const employeeNotif = {
+      id: notifId1,
+      type: "DOCUMENT_REJECTED",
+      employeeId: employee.employeeId || 'EMP-1002',
+      employeeName: employee.name,
+      documentName: profileViewerDoc.name,
+      documentType: profileViewerDoc.type,
+      uploadedAt: new Date().toISOString(),
+      status: "Rejected",
+      targetRoles: ["EMPLOYEE"],
+      message: `Your ${profileViewerDoc.name} was rejected by ${currentUser.role}. Reason: ${rejectionReason.trim()}`,
+      readBy: [],
+      actionRequired: false
+    }
+
+    const peerRole = currentUser.role === 'Admin' ? 'HR' : 'ADMIN';
+    const peerNotif = {
+      id: notifId2,
+      type: "DOCUMENT_REJECTED",
+      employeeId: employee.employeeId || 'EMP-1002',
+      employeeName: employee.name,
+      documentName: profileViewerDoc.name,
+      documentType: profileViewerDoc.type,
+      uploadedAt: new Date().toISOString(),
+      status: "Rejected",
+      targetRoles: [peerRole],
+      message: `${profileViewerDoc.name} submitted by ${employee.name} was rejected by ${currentUser.role}. Reason: ${rejectionReason.trim()}`,
+      readBy: [],
+      actionRequired: false
+    }
+
+    try {
+      const savedNotifs = localStorage.getItem('empflow-notifications')
+      const notifications = savedNotifs ? JSON.parse(savedNotifs) : []
+      notifications.unshift(employeeNotif, peerNotif)
+      localStorage.setItem('empflow-notifications', JSON.stringify(notifications))
+    } catch (e) { console.error(e) }
+
+    window.dispatchEvent(new Event('storage'));
+    
+    setProfileViewerDoc({ ...profileViewerDoc, status: 'Rejected', rejectionReason: rejectionReason.trim() });
+    setShowRejectionInput(false);
+    onAction?.(`${profileViewerDoc.name} rejected successfully`);
+  }
 
   return <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/25 p-4 backdrop-blur-[2px]" onClick={onClose}>
     <div className="employee-profile-card relative w-full max-w-2xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
       <div className="absolute right-16 top-6 z-10"><button aria-label="Employee actions" onClick={() => setMenuOpen((open) => !open)} className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-white/80 ring-1 ring-white/10 transition hover:bg-white/20 hover:text-white"><MoreVertical size={17} /></button>{menuOpen && <div className="absolute right-0 top-10 w-40 rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl">{(currentUser?.role === 'Admin' || currentUser?.role === 'HR') && <button onClick={() => { setMenuOpen(false); setEditOpen(true) }} className="block w-full rounded-lg px-3 py-2 text-left text-xs text-slate-700 transition hover:bg-[#edf3ef] hover:text-[#426759]">Edit</button>}<button onClick={() => { setMenuOpen(false); setDetailsOpen(true); onAction?.('Employee details viewed') }} className="block w-full rounded-lg px-3 py-2 text-left text-xs text-slate-700 transition hover:bg-[#edf3ef] hover:text-[#426759]">View details</button><button onClick={() => { setMenuOpen(false); setDocumentsOpen(true) }} className="block w-full rounded-lg px-3 py-2 text-left text-xs text-slate-700 transition hover:bg-[#edf3ef] hover:text-[#426759]">View documents</button></div>}</div>
       <div className="flex items-start justify-between bg-[#426759] p-6 text-white"><div className="flex items-center gap-4"><div className="flex h-14 w-14 items-center justify-center rounded-full bg-white/20 text-lg font-bold">{employee.name.split(' ').map((name) => name[0]).join('')}</div><div><p className="text-xl font-bold">{employee.name}</p><p className="mt-1 text-xs text-emerald-100">{designation}</p></div></div><button onClick={onClose} className="rounded-lg p-2 text-white/70 hover:bg-white/10 hover:text-white"><X size={18} /></button></div>
-      <div className="grid gap-5 p-6 sm:grid-cols-2"><div><p className="mb-3 text-[10px] font-bold uppercase tracking-wider text-slate-400">Personal information</p><div className="space-y-3"><EditableProfileField label="Full name" value={editName} editing={editOpen} onChange={setEditName} /><EditableProfileField label="Email address" value={editEmail} editing={editOpen} onChange={setEditEmail} /><EditableProfileField label="Phone number" value={editPhone} editing={editOpen} onChange={setEditPhone} /><ProfileField label="Employee ID" value={`EMP-${employee.id.slice(1).padStart(3, '0')}`} /></div></div><div><p className="mb-3 text-[10px] font-bold uppercase tracking-wider text-slate-400">Employment information</p><div className="space-y-3"><ProfileField label="Department" value={department} /><EditableProfileField label="Designation" value={editDesignation} editing={editOpen} onChange={setEditDesignation} /><div className="flex items-center justify-between border-b border-slate-100 pb-2"><span className="text-xs text-slate-400">Current status</span><EmployeeStatusBadge status={employee.status} /></div></div></div></div>
+      <div className="grid gap-5 p-6 sm:grid-cols-2"><div><p className="mb-3 text-[10px] font-bold uppercase tracking-wider text-slate-400">Personal information</p><div className="space-y-3"><EditableProfileField label="Full name" value={editName} editing={editOpen} onChange={setEditName} /><EditableProfileField label="Email address" value={editEmail} editing={editOpen} onChange={setEditEmail} /><EditableProfileField label="Phone number" value={editPhone} editing={editOpen} onChange={setEditPhone} /><ProfileField label="Employee ID" value={employee.employeeId || `EMP-${employee.id.slice(1).padStart(3, '0')}`} /></div></div><div><p className="mb-3 text-[10px] font-bold uppercase tracking-wider text-slate-400">Employment information</p><div className="space-y-3"><ProfileField label="Department" value={department} /><EditableProfileField label="Designation" value={editDesignation} editing={editOpen} onChange={setEditDesignation} /><div className="flex items-center justify-between border-b border-slate-100 pb-2"><span className="text-xs text-slate-400">Current status</span><EmployeeStatusBadge status={employee.status} /></div></div></div></div>
       {detailsOpen && <div className="grid gap-5 border-t border-slate-100 bg-slate-50/50 px-6 py-4 sm:grid-cols-2"><div><p className="mb-3 text-[10px] font-bold uppercase tracking-wider text-slate-400">Contact details</p><div className="space-y-3"><EditableProfileField label="Emergency contact" value={emergencyName} editing={editOpen} onChange={setEmergencyName} /><EditableProfileField label="Emergency number" value={emergencyNumber} editing={editOpen} onChange={setEmergencyNumber} /><EditableProfileField label="Relationship" value={emergencyRelationship} editing={editOpen} onChange={setEmergencyRelationship} /><EditableProfileField label="Address" value={address} editing={editOpen} onChange={setAddress} /></div></div><div><p className="mb-3 text-[10px] font-bold uppercase tracking-wider text-slate-400">Additional employment</p><div className="space-y-3"><EditableProfileField label="Employment type" value={employmentType} editing={editOpen} onChange={setEmploymentType} /><EditableProfileField label="Joining date" value={joiningDate} editing={editOpen} onChange={setJoiningDate} /></div></div></div>}
-      <div className="flex items-end justify-between gap-4 border-t border-slate-100 bg-slate-50/70 px-6 py-4"><div><p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">Employee activity</p><div className="flex flex-wrap gap-2"><button onClick={() => { setDetailsOpen(true); onAction?.('Viewing personal details history') }} className="rounded-full bg-white px-3 py-1.5 text-[11px] text-slate-500 ring-1 ring-slate-200 transition hover:bg-slate-50 hover:text-indigo-600 active:scale-[0.97] cursor-pointer">Profile created</button><button onClick={() => { setDocumentsOpen(true); setDetailsOpen(false) }} className="rounded-full bg-white px-3 py-1.5 text-[11px] text-slate-500 ring-1 ring-slate-200 transition hover:bg-slate-50 hover:text-indigo-600 active:scale-[0.97] cursor-pointer">Documents: {employeeDocs.length}</button><button onClick={() => onAction?.('Profile details synchronized successfully')} className="rounded-full bg-white px-3 py-1.5 text-[11px] text-slate-500 ring-1 ring-slate-200 transition hover:bg-slate-50 hover:text-indigo-600 active:scale-[0.97] cursor-pointer">Last updated today</button></div></div>{editOpen && <button onClick={handleSave} className="rounded-md bg-[#426759] px-3.5 py-2 text-xs font-semibold text-white shadow-sm cursor-pointer">Save changes</button>}</div>
+      <div className="flex items-end justify-between gap-4 border-t border-slate-100 bg-slate-50/70 px-6 py-4"><div><p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">Employee activity</p><div className="flex flex-wrap gap-2"><button onClick={() => { setDetailsOpen(true); setDocumentsOpen(false); setShowAuditLogs(false); onAction?.('Viewing personal details history') }} className="rounded-full bg-white px-3 py-1.5 text-[11px] text-slate-500 ring-1 ring-slate-200 transition hover:bg-slate-50 hover:text-indigo-600 active:scale-[0.97] cursor-pointer">Profile created</button><button onClick={() => { setDocumentsOpen(true); setDetailsOpen(false); setShowAuditLogs(false); }} className="rounded-full bg-white px-3 py-1.5 text-[11px] text-slate-500 ring-1 ring-slate-200 transition hover:bg-slate-50 hover:text-indigo-600 active:scale-[0.97] cursor-pointer">Documents: {employeeDocs.length}</button><button onClick={() => { setShowAuditLogs(true); setDocumentsOpen(false); setDetailsOpen(false); }} className="rounded-full bg-white px-3 py-1.5 text-[11px] text-slate-500 ring-1 ring-slate-200 transition hover:bg-slate-50 hover:text-indigo-600 active:scale-[0.97] cursor-pointer">View Audit History</button></div></div>{editOpen && <button onClick={handleSave} className="rounded-md bg-[#426759] px-3.5 py-2 text-xs font-semibold text-white shadow-sm cursor-pointer">Save changes</button>}</div>
       {editOpen && <div className="absolute inset-x-0 top-[101px] z-20 border-y border-slate-100 bg-white p-6 shadow-lg"><p className="mb-3 text-[10px] font-bold uppercase tracking-wider text-slate-400">Edit employee details</p><div className="grid gap-3 sm:grid-cols-2"><input value={editName} onChange={(event) => setEditName(event.target.value)} className="h-9 rounded-md border border-slate-200 px-3 text-xs" placeholder="Full name" /><input value={editEmail} onChange={(event) => setEditEmail(event.target.value)} className="h-9 rounded-md border border-slate-200 px-3 text-xs" placeholder="Email" /><input value={editPhone} onChange={(event) => setEditPhone(event.target.value)} className="h-9 rounded-md border border-slate-200 px-3 text-xs" placeholder="Phone number" /><input value={editDesignation} onChange={(event) => setEditDesignation(event.target.value)} className="h-9 rounded-md border border-slate-200 px-3 text-xs" placeholder="Designation" /></div><button onClick={handleSave} className="mt-3 rounded-md bg-[#426759] px-3 py-2 text-xs font-semibold text-white cursor-pointer">Save changes</button></div>}
+      
+      {showAuditLogs && (
+        <div className="border-t border-slate-100 bg-white p-6">
+          <div className="mb-3 flex items-center justify-between">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 font-mono">Employee Activity History / Audit Logs</p>
+            <button onClick={() => setShowAuditLogs(false)} className="text-xs text-slate-400 cursor-pointer">Close</button>
+          </div>
+          <div className="max-h-56 overflow-y-auto space-y-2.5 divide-y divide-slate-50">
+            {(() => {
+              let logs = [];
+              try {
+                const saved = localStorage.getItem('empflow-audit-logs');
+                if (saved) {
+                  const parsed = JSON.parse(saved);
+                  if (Array.isArray(parsed)) {
+                    logs = parsed;
+                  }
+                }
+              } catch (e) {}
+              
+              const empId = employee.employeeId || 'EMP-1002';
+              const filteredLogs = logs.filter(log => log.employeeId === empId || log.action.includes(employee.name));
+              
+              if (filteredLogs.length === 0) {
+                return <div className="py-6 text-center text-xs text-slate-400">No activity logged for this employee.</div>
+              }
+              
+              return filteredLogs.map((log) => (
+                <div key={log.id} className="pt-2 text-xs flex justify-between gap-4 font-sans">
+                  <div className="text-slate-600 leading-normal text-left">
+                    • <span className="font-semibold text-slate-700">{log.action}</span>
+                  </div>
+                  <div className="text-[10px] text-slate-400 whitespace-nowrap">
+                    {log.timestamp}
+                  </div>
+                </div>
+              ));
+            })()}
+          </div>
+        </div>
+      )}
+
       {documentsOpen && (
         <div className="border-t border-slate-100 bg-white p-6">
           <div className="mb-3 flex items-center justify-between">
@@ -707,12 +1150,12 @@ function EmployeeProfileCard({ employee, onClose, onAction, currentUser, onUpdat
           <div className="grid gap-2 sm:grid-cols-2">
             {employeeDocs.map((doc) => (
               <div key={doc.name} className="flex items-center justify-between rounded-lg border border-slate-100 p-3 bg-slate-50/50 hover:bg-slate-50 transition">
-                <div>
+                <div className="text-left">
                   <p className="text-xs font-semibold text-slate-700">{doc.name}</p>
-                  <p className="text-[9px] text-slate-400 mt-0.5">{doc.type} · {doc.status}</p>
+                  <p className="text-[9px] text-slate-400 mt-0.5">{doc.type} · <span className={doc.status === 'Approved' ? 'text-emerald-600 font-semibold' : doc.status === 'Rejected' ? 'text-rose-500 font-semibold' : 'text-amber-600 font-semibold'}>{doc.status}</span></p>
                 </div>
                 <button 
-                  onClick={() => setProfileViewerDoc(doc)} 
+                  onClick={() => { setProfileViewerDoc(doc); setShowRejectionInput(false); }} 
                   className="px-2.5 py-1 rounded bg-white border border-slate-200 hover:border-indigo-600 hover:text-indigo-600 transition text-[10px] font-semibold cursor-pointer"
                 >
                   View
@@ -722,7 +1165,7 @@ function EmployeeProfileCard({ employee, onClose, onAction, currentUser, onUpdat
           </div>
         </div>
       )}
-
+ 
       {/* Profile Document Viewer Modal */}
       {profileViewerDoc && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/30 p-4 backdrop-blur-[2px]" onClick={() => setProfileViewerDoc(null)}>
@@ -740,7 +1183,8 @@ function EmployeeProfileCard({ employee, onClose, onAction, currentUser, onUpdat
                 <p><b>Employee:</b> {employee.name}</p>
                 <p><b>Category:</b> {profileViewerDoc.type}</p>
                 <p><b>Issue Date:</b> {profileViewerDoc.date}</p>
-                <p><b>Document Status:</b> {profileViewerDoc.status}</p>
+                <p><b>Document Status:</b> <span className={profileViewerDoc.status === 'Approved' ? 'text-emerald-600 font-bold' : profileViewerDoc.status === 'Rejected' ? 'text-rose-500 font-bold' : 'text-amber-600 font-bold'}>{profileViewerDoc.status}</span></p>
+                {profileViewerDoc.rejectionReason && <p className="text-rose-600"><b>Rejection Reason:</b> {profileViewerDoc.rejectionReason}</p>}
               </div>
               <div className="border-t border-slate-200 pt-3 text-[10px]">
                 {profileViewerDoc.dataUrl && profileViewerDoc.dataUrl.startsWith('data:image/') ? (
@@ -749,20 +1193,20 @@ function EmployeeProfileCard({ employee, onClose, onAction, currentUser, onUpdat
                     <img src={profileViewerDoc.dataUrl} className="mx-auto max-h-[180px] rounded-lg border border-slate-200 shadow-sm" alt={profileViewerDoc.name} />
                   </div>
                 ) : profileViewerDoc.name.includes('Offer Letter') ? (
-                  <div className="space-y-2">
+                  <div className="space-y-2 font-sans text-xs">
                     <p>Dear {employee.name},</p>
                     <p>We are pleased to offer you employment at EmpFlow. Your joining date is set for {joiningDate}. You will report directly to Rohan Mehta.</p>
                     <p>Sincerely,<br/>Aditi Deshmukh (HR Department)</p>
                   </div>
                 ) : profileViewerDoc.name.includes('Identity') || profileViewerDoc.type === 'KYC' ? (
-                  <div className="space-y-2">
+                  <div className="space-y-2 font-sans text-xs">
                     <p><b>IDENTITY VERIFICATION RECORD</b></p>
                     <p>Permanent Account Number (PAN): XXXXX8827X</p>
                     <p>Aadhaar Card: XXXX-XXXX-4927</p>
                     <p className="text-emerald-600 font-bold">Status: Bio-metric verification succeeded via government portal.</p>
                   </div>
                 ) : profileViewerDoc.name.includes('Bank') || profileViewerDoc.type === 'Finance' ? (
-                  <div className="space-y-2">
+                  <div className="space-y-2 font-sans text-xs">
                     <p><b>SALARY ACCOUNT DISBURSEMENT RECORD</b></p>
                     <p>Bank Name: HDFC Bank Ltd</p>
                     <p>Account Number: XXXXXX9928192</p>
@@ -770,7 +1214,7 @@ function EmployeeProfileCard({ employee, onClose, onAction, currentUser, onUpdat
                     <p className="text-emerald-600 font-bold">Status: Salary account active and connected to payroll system.</p>
                   </div>
                 ) : (
-                  <div className="space-y-2">
+                  <div className="space-y-2 font-sans text-xs">
                     <p><b>CONFIDENTIALITY & NON-DISCLOSURE AGREEMENT</b></p>
                     <p>This agreement outlines the responsibilities regarding confidential and proprietary company assets, codebases, and customer information.</p>
                     <p className="text-amber-600 font-bold">Status: Verified & Stored copy.</p>
@@ -779,7 +1223,56 @@ function EmployeeProfileCard({ employee, onClose, onAction, currentUser, onUpdat
               </div>
             </div>
 
-            <div className="flex justify-end">
+            {/* Admin and HR Review Panel */}
+            {(currentUser.role === 'Admin' || currentUser.role === 'HR') && (
+              <div className="mt-4 flex flex-col gap-3 border-t border-slate-100 pt-4 text-left">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Review Action ({currentUser.role})</p>
+                {showRejectionInput ? (
+                  <div className="space-y-2">
+                    <textarea 
+                      value={rejectionReason}
+                      onChange={(e) => setRejectionReason(e.target.value)}
+                      placeholder="Enter reason for rejection..."
+                      rows={2}
+                      className="w-full rounded-lg border border-slate-200 p-2 text-xs outline-none focus:border-rose-500 font-sans"
+                    />
+                    <div className="flex justify-end gap-2">
+                      <button 
+                        onClick={() => setShowRejectionInput(false)}
+                        className="rounded px-2.5 py-1.5 text-[10px] font-semibold border border-slate-200 hover:bg-slate-50 cursor-pointer"
+                      >
+                        Cancel
+                      </button>
+                      <button 
+                        onClick={handleConfirmReject}
+                        className="rounded px-2.5 py-1.5 text-[10px] font-semibold bg-rose-600 hover:bg-rose-700 text-white cursor-pointer"
+                      >
+                        Confirm Reject
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex justify-end gap-2">
+                    <button 
+                      onClick={handleApprove}
+                      disabled={profileViewerDoc.status === 'Approved'}
+                      className="rounded px-3 py-1.5 text-[10px] font-bold bg-[#426759] hover:bg-[#315447] disabled:opacity-40 text-white cursor-pointer"
+                    >
+                      Approve
+                    </button>
+                    <button 
+                      onClick={() => { setShowRejectionInput(true); setRejectionReason(''); }}
+                      disabled={profileViewerDoc.status === 'Rejected'}
+                      className="rounded px-3 py-1.5 text-[10px] font-bold bg-rose-600 hover:bg-rose-700 disabled:opacity-40 text-white cursor-pointer"
+                    >
+                      Reject
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+ 
+            <div className="flex justify-end mt-4 border-t border-slate-100 pt-3">
               <button onClick={() => setProfileViewerDoc(null)} className="px-3.5 py-2 text-xs font-semibold text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50 cursor-pointer">
                 Close
               </button>

@@ -25,7 +25,10 @@ export default function EmployeeDashboard({ currentUser, onAction }) {
   const [documentsList, setDocumentsList] = useState(() => {
     try {
       const saved = localStorage.getItem('empflow-employee-documents')
-      if (saved) return JSON.parse(saved)
+      if (saved) {
+        const parsed = JSON.parse(saved)
+        if (Array.isArray(parsed)) return parsed
+      }
     } catch {}
     return [
       { name: 'Offer Letter', type: 'Employment', status: 'Verified & Signed', date: '15 Jul 2026', file: 'offer_letter_rahul.pdf' },
@@ -36,7 +39,45 @@ export default function EmployeeDashboard({ currentUser, onAction }) {
   })
 
   useEffect(() => {
-    localStorage.setItem('empflow-employee-documents', JSON.stringify(documentsList))
+    if (Array.isArray(documentsList)) {
+      localStorage.setItem('empflow-employee-documents', JSON.stringify(documentsList))
+    }
+  }, [documentsList])
+
+  // Cross-tab synchronization & polling for documents list
+  useEffect(() => {
+    const handleStorageChange = (e) => {
+      if (e.key === 'empflow-employee-documents') {
+        try {
+          const parsed = JSON.parse(e.newValue)
+          if (Array.isArray(parsed) && JSON.stringify(parsed) !== JSON.stringify(documentsList)) {
+            setDocumentsList(parsed)
+          }
+        } catch (err) {
+          console.error(err)
+        }
+      }
+    }
+    window.addEventListener('storage', handleStorageChange)
+    
+    const interval = setInterval(() => {
+      try {
+        const saved = localStorage.getItem('empflow-employee-documents')
+        if (saved) {
+          const parsed = JSON.parse(saved)
+          if (Array.isArray(parsed) && JSON.stringify(parsed) !== JSON.stringify(documentsList)) {
+            setDocumentsList(parsed)
+          }
+        }
+      } catch (err) {
+        console.error(err)
+      }
+    }, 1000)
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange)
+      clearInterval(interval)
+    }
   }, [documentsList])
 
   // Upload document modal states
@@ -65,13 +106,74 @@ export default function EmployeeDashboard({ currentUser, onAction }) {
     const newDoc = {
       name: uploadName,
       type: uploadCategory,
-      status: 'Uploaded',
+      status: 'Pending Review',
       date: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
       file: uploadFile.name,
       dataUrl: uploadFileBase64
     }
 
-    setDocumentsList([...documentsList, newDoc])
+    const updatedDocs = [...documentsList, newDoc]
+    setDocumentsList(updatedDocs)
+    localStorage.setItem('empflow-employee-documents', JSON.stringify(updatedDocs))
+
+    // Formatted timestamp helper
+    const formatDate = (date) => {
+      const day = String(date.getDate()).padStart(2, '0');
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      const month = months[date.getMonth()];
+      const year = date.getFullYear();
+      const hours = String(date.getHours()).padStart(2, '0');
+      const minutes = String(date.getMinutes()).padStart(2, '0');
+      return `${day} ${month} ${year}, ${hours}:${minutes}`;
+    }
+
+    // 1. Create Notification Event
+    const notifId = 'notif_' + Date.now()
+    const newNotif = {
+      id: notifId,
+      type: "DOCUMENT_UPLOADED",
+      employeeId: currentUser.employeeId || "EMP-1002",
+      employeeName: currentUser.name || "Rahul Sharma",
+      documentName: uploadName,
+      documentType: uploadCategory,
+      uploadedAt: new Date().toISOString(),
+      status: "Pending Review",
+      targetRoles: ["ADMIN", "HR"],
+      readBy: [],
+      actionRequired: true
+    }
+
+    try {
+      const savedNotifs = localStorage.getItem('empflow-notifications')
+      const notifications = savedNotifs ? JSON.parse(savedNotifs) : []
+      notifications.unshift(newNotif)
+      localStorage.setItem('empflow-notifications', JSON.stringify(notifications))
+    } catch (err) {
+      console.error(err)
+    }
+
+    // 2. Create Audit Log
+    const auditId = 'l_' + Date.now()
+    const newAudit = {
+      id: auditId,
+      action: `${currentUser.name || "Rahul Sharma"} uploaded ${uploadName}`,
+      timestamp: formatDate(new Date()),
+      user: currentUser.name || "Rahul Sharma",
+      employeeId: currentUser.employeeId || "EMP-1002"
+    }
+
+    try {
+      const savedAudits = localStorage.getItem('empflow-audit-logs')
+      const audits = savedAudits ? JSON.parse(savedAudits) : []
+      audits.unshift(newAudit)
+      localStorage.setItem('empflow-audit-logs', JSON.stringify(audits))
+    } catch (err) {
+      console.error(err)
+    }
+
+    // Notify storage events for cross-tab updates
+    window.dispatchEvent(new Event('storage'))
+
     setUploadModalOpen(false)
     setUploadName('')
     setUploadCategory('')

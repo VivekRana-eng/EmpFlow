@@ -11,6 +11,7 @@ const ACCOUNTS = [
     initials: 'VR',
     designation: 'Super Admin',
     color: 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100/50',
+    employeeId: 'EMP-0000',
   },
   {
     role: 'HR',
@@ -21,6 +22,7 @@ const ACCOUNTS = [
     initials: 'AD',
     designation: 'HR Operations Manager',
     color: 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100/50',
+    employeeId: 'EMP-1001',
   },
   {
     role: 'Manager',
@@ -31,6 +33,7 @@ const ACCOUNTS = [
     initials: 'RM',
     designation: 'Lead UI/UX Designer',
     color: 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100/50',
+    employeeId: 'EMP-1004',
   },
   {
     role: 'Employee',
@@ -41,6 +44,7 @@ const ACCOUNTS = [
     initials: 'RS',
     designation: 'Senior Frontend Developer',
     color: 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100/50',
+    employeeId: 'EMP-1002',
   },
 ]
 
@@ -88,6 +92,7 @@ export default function LoginPage({ onLogin }) {
           name: match.name,
           initials: match.initials,
           designation: match.designation,
+          employeeId: match.employeeId,
         })
       } else {
         setError('Invalid email address or password. Please try again.')
