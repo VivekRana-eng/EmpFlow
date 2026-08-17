@@ -15,6 +15,48 @@ body { margin: 0; min-width: 320px; }
 button, input { font: inherit; }
 button { cursor: pointer; }
 body { overflow-x: hidden; }
+
+/* Keep the workspace calm and let content, rather than decoration, carry the
+   hierarchy. */
+.theme-shell {
+  background-color: color-mix(in srgb, var(--theme-accent) 6%, #e9e8e1) !important;
+}
+.theme-shell aside {
+  box-shadow: 0 8px 24px rgb(15 23 42 / 0.06) !important;
+}
+.theme-shell .shadow-sm {
+  box-shadow: 0 1px 2px rgb(15 23 42 / 0.03) !important;
+}
+.theme-shell .border-slate-200 {
+  border-color: #e2e8f0 !important;
+}
+.theme-shell .border-slate-100 {
+  border-color: #eef2f7 !important;
+}
+.theme-shell .bg-slate-50 {
+  background-color: #f8fafc !important;
+}
+.theme-shell .bg-slate-50\/70 {
+  background-color: #f8fafc !important;
+}
+.theme-shell nav button {
+  min-height: 40px;
+}
+.theme-shell nav button:hover {
+  background-color: #f1f5f9;
+}
+.theme-shell nav button.theme-accent-soft:hover {
+  background-color: var(--theme-accent-soft) !important;
+}
+.theme-shell nav button.bg-indigo-50:hover {
+  background-color: var(--theme-accent-soft) !important;
+}
+.theme-shell nav {
+  gap: 2px;
+}
+.theme-shell .border-b.border-slate-200 {
+  border-color: #e2e8f0 !important;
+}
 .mobile-menu-trigger { position: relative; z-index: 60; touch-action: manipulation; }
 .mobile-menu-overlay { touch-action: auto; }
 .sidebar-scroll {
@@ -35,6 +77,48 @@ body { overflow-x: hidden; }
 .bg-indigo-100 { background-color: #dce9e0 !important; }
 .border-indigo-200 { border-color: #b9d0c1 !important; }
 .shadow-indigo-200 { --tw-shadow-color: rgb(66 103 89 / 0.2) !important; }
+
+/* User-selected workspace accent. Keeping this in one variable makes tabs and
+   both navigation layouts change together without duplicating palette logic. */
+.theme-shell .bg-indigo-600 { background-color: var(--theme-accent) !important; }
+.theme-shell .bg-indigo-50 { background-color: var(--theme-accent-soft) !important; }
+.theme-shell .bg-indigo-100 { background-color: var(--theme-accent-muted) !important; }
+.theme-shell .text-indigo-600,
+.theme-shell .text-indigo-700 { color: var(--theme-accent) !important; }
+.theme-shell .hover\:text-indigo-700:hover { color: var(--theme-accent-dark) !important; }
+.theme-shell .border-indigo-200 { border-color: var(--theme-accent-muted) !important; }
+.theme-accent-bg { background-color: var(--theme-accent) !important; }
+.theme-accent-soft { background-color: var(--theme-accent-soft) !important; }
+.theme-accent-muted { background-color: var(--theme-accent-muted) !important; }
+.theme-accent-text { color: var(--theme-accent) !important; }
+.theme-accent-border { border-color: var(--theme-accent) !important; }
+
+/* Convert the legacy fixed sage utility classes to the selected accent too. */
+.theme-shell button[class*="bg-[#426759]"],
+.theme-shell [class*="bg-[#426759]"] {
+  background-color: var(--theme-accent) !important;
+}
+.theme-shell button[class*="hover:bg-[#315447]"]:hover,
+.theme-shell [class*="hover:bg-[#315447]"]:hover {
+  background-color: var(--theme-accent-dark) !important;
+}
+.theme-shell [class*="text-[#426759]"],
+.theme-shell [class*="group-hover:text-[#426759]"]:hover {
+  color: var(--theme-accent) !important;
+}
+.theme-shell [class*="hover:border-[#b9d0c1]"]:hover {
+  border-color: var(--theme-accent-muted) !important;
+}
+
+/* Keep the main workspace copy readable and neutral; accents belong to
+   navigation, controls, icons, and status indicators. */
+.theme-shell main .text-indigo-600,
+.theme-shell main .text-indigo-700 {
+  color: #0f172a !important;
+}
+.theme-shell main p {
+  color: #0f172a !important;
+}
 
 .onboarding-page select {
   accent-color: #426759;

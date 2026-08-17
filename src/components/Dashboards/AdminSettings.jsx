@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { Plus, Trash2, Edit2, ShieldAlert, Sparkles, FolderLock, ListCollapse, Check } from 'lucide-react'
 import { initialDepartments, initialDesignations } from '../../models/employeeModel'
 
-export default function AdminSettings({ onAction, departments: depts, setDepartments: setDepts, designations: desigs, setDesignations: setDesigs, employeeRecordsState, onUpdateEmployeeRole }) {
+export default function AdminSettings({ onAction, themeColor, setThemeColor, departments: depts, setDepartments: setDepts, designations: desigs, setDesignations: setDesigs, employeeRecordsState, onUpdateEmployeeRole }) {
   const [subTab, setSubTab] = useState('Users & Roles')
   
   // Users list mapped dynamically from employeeRecordsState
@@ -74,13 +74,13 @@ export default function AdminSettings({ onAction, departments: depts, setDepartm
 
       {/* Tabs */}
       <div className="flex border-b border-slate-200 gap-6">
-        {['Users & Roles', 'Organization Master', 'Approval Workflows'].map((tab) => (
+        {['Users & Roles', 'Organization Master', 'Approval Workflows', 'Appearance'].map((tab) => (
           <button
             key={tab}
             onClick={() => setSubTab(tab)}
             className={`pb-3 text-xs font-bold transition border-b-2 px-1 relative ${
               subTab === tab 
-                ? 'border-[#426759] text-slate-900' 
+                ? 'theme-accent-border theme-accent-text text-slate-900' 
                 : 'border-transparent text-slate-400 hover:text-slate-700'
             }`}
           >
@@ -88,6 +88,35 @@ export default function AdminSettings({ onAction, departments: depts, setDepartm
           </button>
         ))}
       </div>
+
+      {subTab === 'Appearance' && (
+        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="mb-5">
+            <h3 className="text-sm font-bold text-slate-800">Navigation & tab colors</h3>
+            <p className="mt-0.5 text-[11px] text-slate-400">Choose an accent that fits your team. It applies to active navigation, tabs, badges, and key actions.</p>
+          </div>
+          <div className="grid gap-5 sm:grid-cols-[1fr_auto] sm:items-end">
+            <div>
+              <p className="mb-3 text-xs font-semibold text-slate-600">Accent presets</p>
+              <div className="flex flex-wrap gap-2.5">
+                {[['Sage', '#426759'], ['Ocean', '#2563eb'], ['Violet', '#7c3aed'], ['Rose', '#db2777'], ['Amber', '#d97706']].map(([name, color]) => (
+                  <button key={name} onClick={() => setThemeColor(color)} className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-semibold transition ${themeColor.toLowerCase() === color ? 'border-slate-800 ring-2 ring-slate-200' : 'border-slate-200 hover:border-slate-300'}`}>
+                    <span className="h-4 w-4 rounded-full" style={{ backgroundColor: color }} />{name}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <label className="flex items-center gap-3 text-xs font-semibold text-slate-600">
+              Custom color
+              <input aria-label="Custom navigation color" type="color" value={themeColor} onChange={(event) => setThemeColor(event.target.value)} className="h-9 w-12 cursor-pointer rounded-lg border border-slate-200 bg-white p-1" />
+            </label>
+          </div>
+          <div className="mt-6 flex items-center gap-3 rounded-lg bg-slate-50 p-3 text-xs text-slate-500">
+            <span className="h-3 w-3 rounded-full" style={{ backgroundColor: themeColor }} />
+            Your selected color is saved automatically for this workspace.
+          </div>
+        </div>
+      )}
 
       {/* Panels */}
       {subTab === 'Users & Roles' && (

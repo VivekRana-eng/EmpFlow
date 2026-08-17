@@ -1,7 +1,16 @@
 import React, { useState, useEffect } from 'react'
 import { FileText, Download, Eye, Send, CheckCircle2, AlertCircle, Clock, ShieldAlert, Sparkles, Building2, User, Plus } from 'lucide-react'
 
-export default function EmployeeDashboard({ currentUser, onAction }) {
+const SAMPLE_EMPLOYEE_DOCUMENTS = [
+  { name: 'Offer Letter', type: 'Employment', status: 'Verified & Signed', date: '15 Jul 2026', file: 'offer_letter_rahul.pdf' },
+  { name: 'Identity Proof (Aadhaar/PAN)', type: 'KYC', status: 'Verified', date: '16 Jul 2026', file: 'kyc_rahul.pdf' },
+  { name: 'Bank Account & PAN details', type: 'Finance', status: 'Verified', date: '16 Jul 2026', file: 'bank_details_rahul.pdf' },
+  { name: 'Degree Certificate', type: 'Academic', status: 'Verified', date: '17 Jul 2026', file: 'degree_certificate_rahul.pdf' },
+  { name: 'Address Proof', type: 'KYC', status: 'Verified', date: '17 Jul 2026', file: 'address_proof_rahul.pdf' },
+  { name: 'Non-Disclosure Agreement', type: 'Compliance', status: 'Pending Signature', date: 'Pending', file: 'nda_rahul.pdf' }
+]
+
+export default function EmployeeDashboard({ currentUser, onAction, documentsOnly = false }) {
   const [resignation, setResignation] = useState(() => {
     try {
       const saved = localStorage.getItem('empflow-offboardings')
@@ -27,15 +36,10 @@ export default function EmployeeDashboard({ currentUser, onAction }) {
       const saved = localStorage.getItem('empflow-employee-documents')
       if (saved) {
         const parsed = JSON.parse(saved)
-        if (Array.isArray(parsed)) return parsed
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed
       }
     } catch {}
-    return [
-      { name: 'Offer Letter', type: 'Employment', status: 'Verified & Signed', date: '15 Jul 2026', file: 'offer_letter_rahul.pdf' },
-      { name: 'Identity Proof (Aadhaar/PAN)', type: 'KYC', status: 'Verified', date: '16 Jul 2026', file: 'kyc_rahul.pdf' },
-      { name: 'Bank Account & PAN details', type: 'Finance', status: 'Verified', date: '16 Jul 2026', file: 'bank_details_rahul.pdf' },
-      { name: 'Non-Disclosure Agreement', type: 'Compliance', status: 'Pending Signature', date: 'Pending', file: 'nda_rahul.pdf' }
-    ]
+    return SAMPLE_EMPLOYEE_DOCUMENTS
   })
 
   useEffect(() => {
@@ -266,7 +270,7 @@ This document serves as an official company record of employment history and cre
   return (
     <div className="space-y-6">
       {/* Welcome Banner */}
-      <section className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
+      <section className={`flex flex-col justify-between gap-4 sm:flex-row sm:items-end ${documentsOnly ? 'hidden' : ''}`}>
         <div>
           <p className="mb-1 text-[13px] font-medium text-[#426759]">Employee Self-Service</p>
           <h2 className="text-[26px] font-bold tracking-[-0.03em] text-slate-900 sm:text-[30px]">
@@ -276,11 +280,19 @@ This document serves as an official company record of employment history and cre
         </div>
       </section>
 
+      {documentsOnly && (
+        <section>
+          <p className="mb-1 text-[13px] font-medium text-[#426759]">Employee Self-Service</p>
+          <h2 className="text-[26px] font-bold tracking-[-0.03em] text-slate-900 sm:text-[30px]">My Documents</h2>
+          <p className="mt-1 text-sm text-slate-500">Access, review, download, or upload your employment documents.</p>
+        </section>
+      )}
+
       {/* Grid of Profile & Documents */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1.2fr_1fr]">
+      <div className={`grid grid-cols-1 gap-6 ${documentsOnly ? '' : 'lg:grid-cols-[1.2fr_1fr]'}`}>
         
         {/* Profile Card */}
-        <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-[0_2px_8px_rgba(15,23,42,0.025)]">
+        <div className={`${documentsOnly ? 'hidden' : ''} rounded-xl border border-slate-200 bg-white p-6 shadow-[0_2px_8px_rgba(15,23,42,0.025)]`}>
           <div className="mb-5 flex items-center gap-4 pb-5 border-b border-slate-100">
             <div className="flex h-16 w-16 items-center justify-center rounded-full bg-[#edf3ef] text-xl font-bold text-[#426759]">
               RS
@@ -385,7 +397,7 @@ This document serves as an official company record of employment history and cre
       </div>
 
       {/* Relieving / Offboarding Section */}
-      <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-[0_2px_8px_rgba(15,23,42,0.025)]">
+      <div className={`${documentsOnly ? 'hidden' : ''} rounded-xl border border-slate-200 bg-white p-6 shadow-[0_2px_8px_rgba(15,23,42,0.025)]`}>
         <div className="mb-6">
           <h3 className="text-sm font-bold text-slate-900">Resignation & Relieving Request</h3>
           <p className="text-xs text-slate-400 mt-0.5">Submit resignation or monitor your exit clearance status</p>

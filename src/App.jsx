@@ -50,6 +50,7 @@ import ReportsWorkspace from './components/Dashboards/ReportsWorkspace'
 
 const navItems = [
   { label: 'Dashboard', icon: LayoutDashboard },
+  { label: 'Documents', icon: FileText },
   { label: 'Employees', icon: Users },
   { label: 'Onboarding', icon: UserPlus, count: initialOnboardingProcesses.filter((process) => process.status !== 'Completed').length },
   { label: 'Offboarding', icon: Archive },
@@ -120,6 +121,7 @@ function App() {
   })
 
   const [activePage, setActivePage] = useState('Dashboard')
+  const [themeColor, setThemeColor] = useState(() => localStorage.getItem('empflow-theme-color') || '#426759')
   const [collapsed, setCollapsed] = useState(true)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [showProfileMenu, setShowProfileMenu] = useState(false)
@@ -301,6 +303,10 @@ function App() {
       { id: 'l4', action: 'Uploaded corporate document templates v2.4 (Offer Letter, Relieving Certificate, NOC).', timestamp: '10 Aug 2026, 07:12', user: 'Aditi Deshmukh' }
     ]
   })
+
+  useEffect(() => {
+    localStorage.setItem('empflow-theme-color', themeColor)
+  }, [themeColor])
 
   useEffect(() => {
     localStorage.setItem('empflow-depts', JSON.stringify(departments))
@@ -665,7 +671,7 @@ function App() {
     Admin: ['Dashboard', 'Employees', 'Onboarding', 'Offboarding', 'Template Management', 'Reports', 'Settings'],
     HR: ['Dashboard', 'Employees', 'Onboarding', 'Offboarding', 'Template Management', 'Reports'],
     Manager: ['Dashboard', 'Employees', 'Reports'],
-    Employee: ['Dashboard'],
+    Employee: ['Dashboard', 'Documents'],
   }[currentUser.role] || ['Dashboard']
 
   const filteredNavItems = navItems.filter((item) => allowedPages.includes(item.label))
@@ -719,10 +725,10 @@ function App() {
   }
 
   return (
-    <div className="min-h-screen bg-[#e9e8e1] p-3 text-slate-900 sm:p-6 lg:p-8">
+    <div className="theme-shell min-h-screen bg-[#e9e8e1] p-3 text-slate-900 sm:p-6 lg:p-8" style={{ '--theme-accent': themeColor, '--theme-accent-dark': `color-mix(in srgb, ${themeColor} 78%, #000)`, '--theme-accent-soft': `color-mix(in srgb, ${themeColor} 10%, white)`, '--theme-accent-muted': `color-mix(in srgb, ${themeColor} 18%, white)` }}>
       <aside className={`fixed bottom-8 left-8 top-8 z-50 hidden rounded-[22px] border border-white/80 bg-white shadow-[0_12px_30px_rgba(53,65,59,0.08)] transition-all duration-200 lg:flex lg:flex-col ${collapsed ? 'w-[68px]' : 'w-[232px]'}`}>
         <div className="flex h-[76px] items-center border-b border-slate-100 px-5">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#426759] text-white shadow-sm shadow-emerald-900/20"><Sparkles size={19} strokeWidth={2.5} /></div>
+          <div className="theme-accent-bg flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-white shadow-sm shadow-emerald-900/20"><Sparkles size={19} strokeWidth={2.5} /></div>
           {!collapsed && <div className="ml-3"><div className="text-[15px] font-bold tracking-tight text-slate-900">Emp<span className="text-indigo-600">Flow</span></div><div className="text-[10px] font-medium uppercase tracking-[0.16em] text-slate-400">People operations</div></div>}
         </div>
         <div className="sidebar-scroll flex-1 overflow-x-hidden overflow-y-auto px-3 py-6">
@@ -734,7 +740,7 @@ function App() {
         <div className="border-t border-slate-100 p-3 space-y-2">
           {!collapsed && (
             <div className="flex items-center gap-3 rounded-xl bg-slate-50 p-2.5">
-              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#426759] text-[11px] font-semibold text-white">
+              <div className="theme-accent-bg flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold text-white">
                 {currentUser.initials}
               </div>
               <div className="min-w-0 flex-1">
@@ -762,7 +768,7 @@ function App() {
           <button title={collapsed ? 'Collapse sidebar' : undefined} onClick={() => setCollapsed(!collapsed)} className="flex w-full items-center justify-center rounded-lg p-2 text-slate-400 hover:bg-slate-50 hover:text-slate-700">{collapsed ? <Menu size={18} /> : <><ChevronRight size={16} className="rotate-180" /><span className="ml-2 text-xs">Collapse sidebar</span></>}</button>
         </div>
       </aside>
-      {mobileMenuOpen && <div className="mobile-menu-overlay fixed inset-0 z-[100] bg-slate-900/30" onClick={() => setMobileMenuOpen(false)}><aside className="h-full w-[260px] bg-white p-4 shadow-2xl" onClick={(event) => event.stopPropagation()}><div className="mb-6 flex items-center justify-between"><div className="flex items-center gap-3"><div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#426759] text-white"><Sparkles size={18} /></div><span className="font-bold text-slate-900">Emp<span className="text-indigo-600">Flow</span></span></div><button onClick={() => setMobileMenuOpen(false)} className="rounded-lg p-2 text-slate-400"><X size={18} /></button></div><nav className="space-y-1">{filteredNavItems.map(({ label, icon: Icon, count }) => <button key={label} onClick={() => { setActivePage(label); setMobileMenuOpen(false) }} className={`flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left text-sm font-medium ${activePage === label ? 'bg-indigo-50 text-indigo-700' : 'text-slate-500 hover:bg-slate-50'}`}><Icon size={18} /><span className="flex-1">{label}</span>{count && <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] text-indigo-700">{count}</span>}</button>)}</nav></aside></div>}
+      {mobileMenuOpen && <div className="mobile-menu-overlay fixed inset-0 z-[100] bg-slate-900/30" onClick={() => setMobileMenuOpen(false)}><aside className="h-full w-[260px] bg-white p-4 shadow-2xl" onClick={(event) => event.stopPropagation()}><div className="mb-6 flex items-center justify-between"><div className="flex items-center gap-3"><div className="theme-accent-bg flex h-9 w-9 items-center justify-center rounded-xl text-white"><Sparkles size={18} /></div><span className="font-bold text-slate-900">Emp<span className="theme-accent-text">Flow</span></span></div><button onClick={() => setMobileMenuOpen(false)} className="rounded-lg p-2 text-slate-400"><X size={18} /></button></div><nav className="space-y-1">{filteredNavItems.map(({ label, icon: Icon, count }) => <button key={label} onClick={() => { setActivePage(label); setMobileMenuOpen(false) }} className={`flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left text-sm font-medium ${activePage === label ? 'bg-indigo-50 text-indigo-700' : 'text-slate-500 hover:bg-slate-50'}`}><Icon size={18} /><span className="flex-1">{label}</span>{count && <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] text-indigo-700">{count}</span>}</button>)}</nav></aside></div>}
 
       <main className={`w-full transition-all duration-200 ${collapsed ? 'lg:pl-[84px]' : 'lg:pl-[248px]'}`}>
         <header className={`sticky top-0 z-40 flex h-[76px] items-center justify-between border-0 bg-transparent px-4 transition-all duration-200 sm:px-7 ${isScrolled ? 'backdrop-blur-[2px] backdrop-saturate-100' : ''}`}>
@@ -887,7 +893,7 @@ function App() {
 
         <div className="p-2 pb-8 sm:p-5 sm:pb-8">
           {currentUser.role === 'Employee' ? (
-            <EmployeeDashboard currentUser={currentUser} onAction={showToast} />
+            <EmployeeDashboard currentUser={currentUser} onAction={showToast} documentsOnly={activePage === 'Documents'} />
           ) : currentUser.role === 'Manager' ? (
             activePage === 'Employees' ? (
               <EmployeeDirectory search={search} onAction={showToast} currentUser={currentUser} employeeRecordsState={employeeRecordsState} departments={departments} designations={designations} onUpdateEmployee={handleUpdateEmployee} selectedEmployee={selectedEmployee} setSelectedEmployee={setSelectedEmployee} autoOpenDocName={autoOpenDocName} setAutoOpenDocName={setAutoOpenDocName} />
@@ -905,7 +911,7 @@ function App() {
           ) : activePage === 'Offboarding' ? (
             <OffboardingBoard offboardings={offboardings} onToggleTask={handleToggleOffboardingTask} onRemove={handleRemoveOffboarding} />
           ) : activePage === 'Settings' ? (
-            <AdminSettings onAction={showToast} departments={departments} setDepartments={setDepartments} designations={designations} setDesignations={setDesignations} employeeRecordsState={employeeRecordsState} onUpdateEmployeeRole={handleUpdateEmployeeRole} />
+            <AdminSettings onAction={showToast} themeColor={themeColor} setThemeColor={setThemeColor} departments={departments} setDepartments={setDepartments} designations={designations} setDesignations={setDesignations} employeeRecordsState={employeeRecordsState} onUpdateEmployeeRole={handleUpdateEmployeeRole} />
           ) : activePage === 'Template Management' ? (
             <TemplateManagement currentUser={currentUser} employeeRecordsState={employeeRecordsState} departments={departments} designations={designations} showToast={showToast} />
           ) : activePage === 'Reports' ? (
