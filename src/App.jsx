@@ -10,7 +10,6 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
-  CircleHelp,
   ClipboardCheck,
   ClipboardList,
   Clock3,
@@ -20,6 +19,7 @@ import {
   LayoutDashboard,
   LogOut,
   Menu,
+  Palette,
   MoreHorizontal,
   MoreVertical,
   Plus,
@@ -47,6 +47,7 @@ import ManagerDashboard from './components/Dashboards/ManagerDashboard'
 import AdminSettings from './components/Dashboards/AdminSettings'
 import TemplateManagement from './components/Dashboards/TemplateManagement'
 import ReportsWorkspace from './components/Dashboards/ReportsWorkspace'
+import EmployeeSettings from './components/Dashboards/EmployeeSettings'
 
 const navItems = [
   { label: 'Dashboard', icon: LayoutDashboard },
@@ -671,7 +672,7 @@ function App() {
     Admin: ['Dashboard', 'Employees', 'Onboarding', 'Offboarding', 'Template Management', 'Reports', 'Settings'],
     HR: ['Dashboard', 'Employees', 'Onboarding', 'Offboarding', 'Template Management', 'Reports'],
     Manager: ['Dashboard', 'Employees', 'Reports'],
-    Employee: ['Dashboard', 'Documents'],
+    Employee: ['Dashboard', 'Documents', 'Settings'],
   }[currentUser.role] || ['Dashboard']
 
   const filteredNavItems = navItems.filter((item) => allowedPages.includes(item.label))
@@ -783,7 +784,7 @@ function App() {
             </div>
             <div className="relative">
               <button 
-                onClick={() => { setShowNotifications(!showNotifications); setShowHelp(false); setShowProfileMenu(false); }}
+                onClick={() => { setShowNotifications(!showNotifications); setShowProfileMenu(false); }}
                 className="relative rounded-lg p-2 text-slate-500 hover:bg-slate-50 cursor-pointer"
               >
                 <Bell size={18} />
@@ -837,12 +838,10 @@ function App() {
             </div>
 
             <div className="relative hidden sm:block">
-              <button 
-                onClick={() => { setShowHelp(!showHelp); setShowNotifications(false); setShowProfileMenu(false) }}
-                className="rounded-lg p-2 text-slate-500 hover:bg-slate-50 cursor-pointer"
-              >
-                <CircleHelp size={18} />
-              </button>
+              <label title="Change appearance color" aria-label="Change appearance color" className="relative flex h-9 w-9 cursor-pointer items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-50 hover:text-slate-900">
+                <Palette size={18} />
+                <input aria-label="Appearance color" type="color" value={themeColor} onChange={(event) => setThemeColor(event.target.value)} className="absolute inset-0 h-full w-full cursor-pointer opacity-0" />
+              </label>
               {showHelp && (
                 <div className="absolute right-0 top-11 z-50 w-72 rounded-xl border border-slate-200 bg-white p-4 shadow-xl text-left space-y-3 font-sans">
                   <div className="flex items-center justify-between border-b border-slate-100 pb-2">
@@ -893,7 +892,9 @@ function App() {
 
         <div className="p-2 pb-8 sm:p-5 sm:pb-8">
           {currentUser.role === 'Employee' ? (
-            <EmployeeDashboard currentUser={currentUser} onAction={showToast} documentsOnly={activePage === 'Documents'} />
+            activePage === 'Settings' ? <EmployeeSettings currentUser={currentUser} themeColor={themeColor} setThemeColor={setThemeColor} /> : (
+              <EmployeeDashboard currentUser={currentUser} onAction={showToast} documentsOnly={activePage === 'Documents'} />
+            )
           ) : currentUser.role === 'Manager' ? (
             activePage === 'Employees' ? (
               <EmployeeDirectory search={search} onAction={showToast} currentUser={currentUser} employeeRecordsState={employeeRecordsState} departments={departments} designations={designations} onUpdateEmployee={handleUpdateEmployee} selectedEmployee={selectedEmployee} setSelectedEmployee={setSelectedEmployee} autoOpenDocName={autoOpenDocName} setAutoOpenDocName={setAutoOpenDocName} />
@@ -911,7 +912,7 @@ function App() {
           ) : activePage === 'Offboarding' ? (
             <OffboardingBoard offboardings={offboardings} onToggleTask={handleToggleOffboardingTask} onRemove={handleRemoveOffboarding} />
           ) : activePage === 'Settings' ? (
-            <AdminSettings onAction={showToast} themeColor={themeColor} setThemeColor={setThemeColor} departments={departments} setDepartments={setDepartments} designations={designations} setDesignations={setDesignations} employeeRecordsState={employeeRecordsState} onUpdateEmployeeRole={handleUpdateEmployeeRole} />
+            <AdminSettings onAction={showToast} departments={departments} setDepartments={setDepartments} designations={designations} setDesignations={setDesignations} employeeRecordsState={employeeRecordsState} onUpdateEmployeeRole={handleUpdateEmployeeRole} />
           ) : activePage === 'Template Management' ? (
             <TemplateManagement currentUser={currentUser} employeeRecordsState={employeeRecordsState} departments={departments} designations={designations} showToast={showToast} />
           ) : activePage === 'Reports' ? (
@@ -930,7 +931,6 @@ function App() {
                 </div>
                 <div className="flex gap-2">
                   <button onClick={() => handleQuickAction('Start onboarding')} className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3.5 py-2.5 text-xs font-semibold text-slate-700 shadow-sm transition hover:border-[#b9d0c1] hover:text-indigo-700"><UserPlus size={16} />Start onboarding</button>
-                  <button onClick={() => handleQuickAction('Add employee')} className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#426759] px-3.5 py-2.5 text-xs font-semibold text-white shadow-sm shadow-[#426759]/20 transition hover:bg-[#315447]"><Plus size={16} />Add employee</button>
                 </div>
               </section>
 
@@ -975,7 +975,7 @@ function App() {
                 ))}
               </section>
 
-            <section className="mb-7 grid grid-cols-1 gap-5 xl:grid-cols-[1.6fr_1fr]"><div className="rounded-xl border border-slate-200 bg-white p-5 sm:p-6"><div className="mb-6 flex items-center justify-between"><div><h3 className="text-sm font-bold text-slate-900">Employee lifecycle overview</h3><p className="mt-1 text-xs text-slate-400">Current workforce distribution by stage</p></div><button className="text-xs font-semibold text-indigo-600 hover:text-indigo-700">View details <ChevronRight size={13} className="inline" /></button></div><div className="relative grid grid-cols-5 gap-1">{lifecycleStages.map(([stage, amount, bg, color], index) => <div key={stage} className="relative text-center"><div className={`mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full ${bg} ${color} text-lg font-bold ring-4 ring-white sm:h-16 sm:w-16`}>{amount}</div>{index < 4 && <div className="absolute left-[calc(50%+34px)] top-7 hidden h-px w-[calc(100%-52px)] bg-slate-200 sm:block" />}<p className="text-[10px] font-semibold text-slate-600 sm:text-[11px]">{stage}</p><p className="mt-1 text-[10px] text-slate-400">{index === 2 ? 'employees' : 'people'}</p></div>)}</div><div className="mt-7 flex items-center justify-between rounded-lg bg-slate-50 px-4 py-3"><div className="flex items-center gap-2"><div className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-100 text-emerald-600"><Check size={14} /></div><span className="text-xs font-medium text-slate-600">Lifecycle health is looking good</span></div><span className="text-xs font-bold text-emerald-600">{Math.round((employeeRecords.filter((employee) => employee.status === 'Active').length / Math.max(1, totalEmployees)) * 100)}% on track</span></div></div><div className="rounded-xl border border-slate-200 bg-white p-5 sm:p-6"><div className="mb-5 flex items-center justify-between"><div><h3 className="text-sm font-bold text-slate-900">Quick actions</h3><p className="mt-1 text-xs text-slate-400">Common HR workflows</p></div></div><div className="grid grid-cols-2 gap-2.5">{[[UserPlus, 'Add employee', 'Create profile'], [ClipboardCheck, 'Start onboarding', 'Begin a workflow'], [Archive, 'Initiate relieving', 'Start exit process'], [FileText, 'Upload template', 'Add a document'], [Activity, 'Generate report', 'View insights'], [CalendarDays, 'View calendar', 'Upcoming events']].map(([Icon, title, subtitle]) => <button key={title} onClick={() => handleQuickAction(title)} className="group rounded-lg border border-slate-100 bg-slate-50 p-3 text-left transition hover:border-[#b9d0c1] hover:bg-[#edf3ef] cursor-pointer"><Icon size={17} className="mb-2 text-[#426759]" /><p className="text-[11px] font-semibold text-slate-700 group-hover:text-[#426759]">{title}</p><p className="mt-0.5 text-[10px] text-slate-400">{subtitle}</p></button>)}</div></div></section>
+              <section className="mb-7 grid grid-cols-1 gap-5 xl:grid-cols-[1.6fr_1fr]"><div className="rounded-xl border border-slate-200 bg-white p-5 sm:p-6"><div className="mb-6 flex items-center justify-between"><div><h3 className="text-sm font-bold text-slate-900">Employee lifecycle overview</h3><p className="mt-1 text-xs text-slate-400">Current workforce distribution by stage</p></div><button className="text-xs font-semibold text-indigo-600 hover:text-indigo-700">View details <ChevronRight size={13} className="inline" /></button></div><div className="relative grid grid-cols-5 gap-1">{lifecycleStages.map(([stage, amount, bg, color], index) => <div key={stage} className="relative text-center"><div className={`mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full ${bg} ${color} text-lg font-bold ring-4 ring-white sm:h-16 sm:w-16`}>{amount}</div>{index < 4 && <div className="absolute left-[calc(50%+34px)] top-7 hidden h-px w-[calc(100%-52px)] bg-slate-200 sm:block" />}<p className="text-[10px] font-semibold text-slate-600 sm:text-[11px]">{stage}</p><p className="mt-1 text-[10px] text-slate-400">{index === 2 ? 'employees' : 'people'}</p></div>)}</div><div className="mt-7 flex items-center justify-between rounded-lg bg-slate-50 px-4 py-3"><div className="flex items-center gap-2"><div className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-100 text-emerald-600"><Check size={14} /></div><span className="text-xs font-medium text-slate-600">Lifecycle health is looking good</span></div><span className="text-xs font-bold text-emerald-600">{Math.round((employeeRecords.filter((employee) => employee.status === 'Active').length / Math.max(1, totalEmployees)) * 100)}% on track</span></div></div><div className="rounded-xl border border-slate-200 bg-white p-5 sm:p-6"><div className="mb-5 flex items-center justify-between"><div><h3 className="text-sm font-bold text-slate-900">Quick actions</h3><p className="mt-1 text-xs text-slate-400">Common HR workflows</p></div></div><div className="grid grid-cols-2 gap-2.5">{[[ClipboardCheck, 'Start onboarding', 'Begin a workflow'], [Archive, 'Initiate relieving', 'Start exit process'], [FileText, 'Upload template', 'Add a document'], [Activity, 'Generate report', 'View insights'], [CalendarDays, 'View calendar', 'Upcoming events']].map(([Icon, title, subtitle]) => <button key={title} onClick={() => handleQuickAction(title)} className="group rounded-lg border border-slate-100 bg-slate-50 p-3 text-left transition hover:border-[#b9d0c1] hover:bg-[#edf3ef] cursor-pointer"><Icon size={17} className="mb-2 text-[#426759]" /><p className="text-[11px] font-semibold text-slate-700 group-hover:text-[#426759]">{title}</p><p className="mt-0.5 text-[10px] text-slate-400">{subtitle}</p></button>)}</div></div></section>
               <section className="mb-7 rounded-xl border border-slate-200 bg-white">
                 <div className="flex flex-col justify-between gap-3 border-b border-slate-100 p-5 sm:flex-row sm:items-center sm:p-6">
                   <div>
@@ -1680,7 +1680,6 @@ function EmployeeDirectory({ search, onAction, currentUser, employeeRecordsState
   return <div className="employee-directory space-y-5">
     <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
       <div><p className="mb-1 text-[13px] font-medium text-indigo-600">People directory</p><h2 className="text-[26px] font-bold tracking-tight text-slate-900">Employee master</h2><p className="mt-1 text-sm text-slate-500">Manage profiles, departments and employee records in one place.</p></div>
-      <button onClick={() => onAction('Add employee form opened')} className="inline-flex items-center justify-center gap-2 rounded-lg bg-indigo-600 px-3.5 py-2.5 text-xs font-semibold text-white shadow-sm shadow-indigo-200 hover:bg-indigo-700"><Plus size={16} />Add employee</button>
     </div>
     <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-[0_2px_8px_rgba(15,23,42,0.025)] sm:p-5">
       <div className="mb-5 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between"><div><h3 className="text-sm font-bold text-slate-900">All employees <span className="ml-1 rounded-full bg-slate-100 px-2 py-1 text-[10px] text-slate-500">{rows.length}</span></h3><p className="mt-1 text-xs text-slate-400">Search and filter your workforce directory</p></div><div className="flex flex-wrap gap-2"><select value={department} onChange={(event) => { setDepartment(event.target.value); setPage(1) }} className="h-9 rounded-lg border border-slate-200 bg-white px-3 text-xs text-slate-600 outline-none focus:border-indigo-300"><option>All departments</option>{initialDepartments.map((item) => <option key={item.id}>{item.name}</option>)}</select><select value={status} onChange={(event) => { setStatus(event.target.value); setPage(1) }} className="h-9 rounded-lg border border-slate-200 bg-white px-3 text-xs text-slate-600 outline-none focus:border-indigo-300"><option>All statuses</option><option>Active</option><option>Onboarding</option><option>Offboarding</option></select><button onClick={() => onAction('Employee filters are ready')} className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-slate-200 px-3 text-xs font-semibold text-slate-600 hover:border-indigo-200 hover:text-indigo-700"><Filter size={14} />Filters</button></div></div>
